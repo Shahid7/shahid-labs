@@ -109,7 +109,7 @@ export default function Home() {
                   💀 Recruitment Verdict
                 </h3>
                 <div className="flex gap-2">
-                  <button onClick={copyToClipboard} className="p-2 hover:bg-zinc-800 rounded-md transition text-zinc-400">
+                  <button onClick={() => copyToClipboard(roast)} className="p-2 hover:bg-zinc-800 rounded-md transition text-zinc-400">
                     {copied ? <Check size={18} className="text-green-500" /> : <Copy size={18} />}
                   </button>
                   <button className="p-2 hover:bg-zinc-800 rounded-md transition text-zinc-400">
