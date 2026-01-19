@@ -2,7 +2,7 @@
 
 import { useState, ChangeEvent } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Flame, Loader2, Copy, Check, Share2, Sparkles } from "lucide-react";
+import { Flame, Terminal, Loader2, Copy, Check, Share2, Sparkles } from "lucide-react";
 import { toast } from 'sonner';
 
 export default function Home() {
@@ -60,21 +60,17 @@ export default function Home() {
         animate={{ opacity: 1, y: 0 }}
         className="max-w-2xl w-full space-y-8 z-10"
       >
-        {/* Line 63: Make sure the opening div has a matching closing </div> later */}
-<div className="text-center space-y-3">
-  <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-zinc-900 border border-zinc-800 text-xs font-medium text-orange-500 mb-2">
-     AI Analysis Active
-  </div> {/* <-- Make sure this is closed! */}
-
-  <p className="text-zinc-500 text-sm">
-    Built with 🔥 by{" "}
-    <span className="relative group cursor-pointer inline-block">
-      <span className="relative z-10 font-medium transition-colors group-hover:text-white px-2 py-1">
-        Shahid Ali
-      </span>
-      <span className="absolute inset-0 bg-orange-600 scale-0 group-hover:scale-100 transition-transform duration-300 ease-out -rotate-2 rounded-tl-2xl rounded-br-2xl -z-0"></span>
+        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-zinc-900 border border-zinc-800 text-xs font-medium text-orange-500 mb-2">
+  <Terminal size={12} /> 
+  <span>Built with ⚡️ by</span>
+  
+  <span className="relative group cursor-pointer ml-1">
+    <span className="relative z-10 transition-colors group-hover:text-white px-1">
+      Shahid Ali
     </span>
-  </p>
+    {/* This is your unique hover shape */}
+    <span className="absolute inset-0 bg-orange-600 scale-0 group-hover:scale-110 transition-transform duration-200 ease-out -rotate-3 rounded-sm -z-0"></span>
+  </span>
 </div>
 
         <div className="relative group">
