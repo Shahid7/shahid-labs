@@ -3,6 +3,7 @@
 import { useState, ChangeEvent } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Flame, Loader2, Copy, Check, Share2, Sparkles } from "lucide-react";
+import { toast } from 'sonner';
 
 export default function Home() {
   const [resumeText, setResumeText] = useState<string>("");
@@ -29,12 +30,21 @@ export default function Home() {
     setLoading(false);
   };
 
-  const copyToClipboard = () => {
-    navigator.clipboard.writeText(roast);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-    alert("Roast copied to clipboard! Go shame yourself on social media.");
-
+  const funMessages = [
+    "Go ahead, share your shame on social media. 💀",
+    "Copied! Now go show your mom why you're still unemployed.",
+    "Your failure has been saved to your clipboard.",
+    "Ready to post? Don't forget to tag your ex-boss."
+  ];
+  
+  const copyToClipboard = (text: string) => {
+    const randomMessage = funMessages[Math.floor(Math.random() * funMessages.length)];
+    navigator.clipboard.writeText(text);
+    
+    toast.info('Copied to Clipboard', {
+      description: randomMessage,
+      style: { background: '#18181b', color: '#fff', border: '1px solid #3f3f46' }
+    });
   };
 
   return (
