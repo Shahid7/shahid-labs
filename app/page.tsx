@@ -59,10 +59,10 @@ export default function Home() {
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         className="max-w-2xl w-full space-y-8 z-10"
-      >
+      
         <div className="text-center space-y-3">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-zinc-900 border border-zinc-800 text-xs font-medium text-orange-500 mb-2">
-            <Sparkles size={12} /> Built with ⚡️ by Shahid Ali
+             Built with ⚡️ by Shahid Ali
           </div>
           <h1 className="text-5xl font-extrabold tracking-tight bg-gradient-to-br from-white via-zinc-400 to-zinc-600 bg-clip-text text-transparent">
             Resume <span className="text-orange-500">Roaster</span>
