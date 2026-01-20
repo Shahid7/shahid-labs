@@ -1,8 +1,7 @@
 "use client";
-
 import { useState, ChangeEvent } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Flame, Terminal, Loader2, Copy, Check, Share2, Sparkles } from "lucide-react";
+import { Flame, Terminal, Loader2, Copy, Check, Share2, Upload } from "lucide-react";
 import { toast } from 'sonner';
 
 export default function Home() {
@@ -10,9 +9,14 @@ export default function Home() {
   const [roast, setRoast] = useState<string>("");
   const [loading, setLoading] = useState<boolean>(false);
   const [copied, setCopied] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
 
-  const handleRoast = async () => {
-    if (!resumeText) return;
+  const handleRoast = async (text?: string) => {
+    const contentToRoast = typeof text === 'string' ? text : resumeText;
+    if (!contentToRoast) {
+      toast.error("Nothing to roast! Paste text or upload a PDF.");
+      return;
+    }
     setLoading(true);
     setRoast("");
 
@@ -29,6 +33,33 @@ export default function Home() {
     }
     setLoading(false);
   };
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+  
+    setIsUploading(true);
+    const formData = new FormData();
+    formData.append('file', file);
+  
+    try {
+      const response = await fetch('/api/extract-pdf', {
+        method: 'POST',
+        body: formData,
+      });
+      const data = await response.json();
+      
+      // Now pass the extracted text to your AI roasting function
+      handleRoast(data.text); 
+      toast.success("PDF Uploaded!", { description: "AI is now reading your failures..." });
+    } catch (err) {
+      toast.error("Upload failed");
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  
 
   const funMessages = [
     "Go ahead, share your shame on social media. 💀",
@@ -82,17 +113,32 @@ export default function Home() {
         <div className="relative group">
           <div className="absolute -inset-0.5 bg-gradient-to-r from-orange-500 to-red-600 rounded-2xl blur opacity-20 group-hover:opacity-40 transition duration-1000"></div>
           <div className="relative bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden">
-            <textarea
+            {/* <textarea
               value={resumeText}
               onChange={(e) => setResumeText(e.target.value)}
               placeholder="Drop your 'experience' here..."
               className="w-full h-56 bg-transparent p-6 focus:outline-none text-zinc-300 placeholder:text-zinc-700 resize-none leading-relaxed"
-            />
+            /> */}
+            <div className="border-2 border-dashed border-zinc-800 rounded-xl p-8 text-center hover:border-orange-500 transition-colors">
+  <input 
+    type="file" 
+    accept=".pdf" 
+    onChange={handleFileUpload} 
+    className="hidden" 
+    id="resume-upload" 
+  />
+  <label htmlFor="resume-upload" className="cursor-pointer flex flex-col items-center">
+    <Upload className="w-10 h-10 text-zinc-500 mb-2" />
+    <span className="text-sm text-zinc-400">
+      {isUploading ? "Reading your secrets..." : "Drop your PDF here or click to upload"}
+    </span>
+  </label>
+</div>
           </div>
         </div>
 
         <button
-          onClick={handleRoast}
+          onClick={() => handleRoast()}
           disabled={loading || !resumeText}
           className="w-full py-4 bg-white text-black rounded-xl font-bold text-lg hover:bg-orange-500 hover:text-white transition-all duration-300 active:scale-[0.98] disabled:opacity-50 disabled:hover:bg-white disabled:hover:text-black flex items-center justify-center gap-2 shadow-xl shadow-orange-500/10"
         >
