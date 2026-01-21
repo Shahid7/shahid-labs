@@ -1,8 +1,10 @@
 "use client";
 import { useState, ChangeEvent } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Flame, Terminal, Loader2, Copy, Check, Share2, Upload } from "lucide-react";
+import { Flame, Terminal, Loader2, Copy, Trash2, Check, Share2, CheckCircle, Info, Upload } from "lucide-react";
 import { toast } from 'sonner';
+
+
 
 export default function Home() {
   const [resumeText, setResumeText] = useState<string>("");
@@ -11,25 +13,32 @@ export default function Home() {
   const [copied, setCopied] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
 
+  const handleClear = () => {
+    setResumeText("");
+    setRoast("");
+    // Reset the file input visually
+    const fileInput = document.getElementById('resume-upload') as HTMLInputElement;
+    if (fileInput) fileInput.value = "";
+    toast.success("Ready for the next victim! 💀");
+  };
+
   const handleRoast = async (text?: string) => {
-    const contentToRoast = typeof text === 'string' ? text : resumeText;
-    if (!contentToRoast) {
-      toast.error("Nothing to roast! Paste text or upload a PDF.");
-      return;
-    }
+    const contentToRoast = text || resumeText;
+    if (!contentToRoast) return;
+
     setLoading(true);
     setRoast("");
 
     try {
       const res = await fetch("/api/roast", {
         method: "POST",
-        body: JSON.stringify({ resumeText }),
         headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ resumeText: contentToRoast }),
       });
       const data = await res.json();
       setRoast(data.reply);
     } catch (err) {
-      setRoast("The AI is speechless. Your resume broke the roast engine.");
+      setRoast("The AI is speechless.");
     }
     setLoading(false);
   };
@@ -43,22 +52,22 @@ export default function Home() {
     formData.append('file', file);
   
     try {
-      const response = await fetch('/api/extract-pdf', {
+      const response = await fetch('/api/roast', { // We use the same route
         method: 'POST',
         body: formData,
       });
       const data = await response.json();
-      
-      // Now pass the extracted text to your AI roasting function
-      handleRoast(data.text); 
-      toast.success("PDF Uploaded!", { description: "AI is now reading your failures..." });
+  
+      if (data.text) {
+        setResumeText(data.text); // Save text to state
+        toast.success("Resume Loaded!", { description: "Click the ROAST ME button to begin the carnage." });
+      }
     } catch (err) {
       toast.error("Upload failed");
     } finally {
       setIsUploading(false);
     }
   };
-
   
 
   const funMessages = [
@@ -119,7 +128,24 @@ export default function Home() {
               placeholder="Drop your 'experience' here..."
               className="w-full h-56 bg-transparent p-6 focus:outline-none text-zinc-300 placeholder:text-zinc-700 resize-none leading-relaxed"
             /> */}
-            <div className="border-2 border-dashed border-zinc-800 rounded-xl p-8 text-center hover:border-orange-500 transition-colors">
+  <div 
+  className="border-2 border-dashed border-zinc-800 rounded-xl p-8 text-center hover:border-orange-500 transition-colors"
+  onDragOver={(e) => e.preventDefault()} // Stops browser from opening file
+  onDrop={(e) => {
+    e.preventDefault();
+    const file = e.dataTransfer.files?.[0];
+    if (file) {
+      // Manually trigger the file upload logic
+      const dataTransfer = new DataTransfer();
+      dataTransfer.items.add(file);
+      const input = document.getElementById('resume-upload') as HTMLInputElement;
+      if (input) {
+        input.files = dataTransfer.files;
+        handleFileUpload({ target: input } as any);
+      }
+    }
+  }}
+>
   <input 
     type="file" 
     accept=".pdf" 
@@ -130,24 +156,58 @@ export default function Home() {
   <label htmlFor="resume-upload" className="cursor-pointer flex flex-col items-center">
     <Upload className="w-10 h-10 text-zinc-500 mb-2" />
     <span className="text-sm text-zinc-400">
-      {isUploading ? "Reading your secrets..." : "Drop your PDF here or click to upload"}
+      {isUploading ? "Reading your secrets..." : resumeText ? "PDF Loaded! Click Roast Me ↓" : "Drop your PDF here or click to upload"}
     </span>
   </label>
 </div>
           </div>
         </div>
+      
+      {/* playful badge for the user */}
+        {resumeText && (
+  <motion.div 
+    initial={{ opacity: 0, y: 10 }}
+    animate={{ opacity: 1, y: 0 }}
+    className="flex items-center justify-between px-4 py-2 mb-4 rounded-lg bg-zinc-900/50 border border-zinc-800"
+  >
+    <div className="flex items-center gap-3">
+      {/* Animated Pulse Dot */}
+      <div className="relative flex h-2 w-2">
+        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-orange-400 opacity-75"></span>
+        <span className="relative inline-flex rounded-full h-2 w-2 bg-orange-500"></span>
+      </div>
+      
+      <span className="text-[10px] uppercase tracking-[0.2em] text-zinc-500 font-bold">
+        Intelligence Extracted
+      </span>
+    </div>
 
-        <button
-          onClick={() => handleRoast()}
-          disabled={loading || !resumeText}
-          className="w-full py-4 bg-white text-black rounded-xl font-bold text-lg hover:bg-orange-500 hover:text-white transition-all duration-300 active:scale-[0.98] disabled:opacity-50 disabled:hover:bg-white disabled:hover:text-black flex items-center justify-center gap-2 shadow-xl shadow-orange-500/10"
-        >
-          {loading ? (
-            <><Loader2 className="animate-spin" /> Analyzing your failures...</>
-          ) : (
-            <><Flame size={20} /> ROAST ME</>
-          )}
-        </button>
+    <div className="flex items-baseline gap-1">
+      <span className="text-xl font-mono font-black text-white">
+        {resumeText.length.toLocaleString()}
+      </span>
+      <span className="text-[10px] text-zinc-600 font-bold uppercase">Chars</span>
+    </div>
+  </motion.div>
+)}
+
+<button
+  onClick={() => handleRoast()}
+  // Disable if: 1. Loading, 2. No resume text, OR 3. Roast already exists
+  disabled={loading || !resumeText || !!roast} 
+  className={`w-full py-4 rounded-xl font-bold text-lg transition-all duration-300 flex items-center justify-center gap-2 
+    ${(loading || !resumeText || roast) 
+      ? 'bg-zinc-800 text-zinc-500 cursor-not-allowed opacity-50' 
+      : 'bg-white text-black hover:bg-orange-500 hover:text-white shadow-xl shadow-orange-500/20'}`}
+>
+  {loading ? (
+    <><Loader2 className="animate-spin" /> Analyzing your failures ... </>
+  ) : roast ? (
+    <><CheckCircle size={20} /> ALREADY ROASTED</>
+  ) : (
+    <><Flame size={20} /> ROAST ME</>
+  )}
+</button>
 
         
 
@@ -170,11 +230,30 @@ export default function Home() {
                   <button className="p-2 hover:bg-zinc-800 rounded-md transition text-zinc-400">
                     <Share2 size={18} />
                   </button>
+                  
                 </div>
               </div>
               <p className="text-zinc-300 leading-relaxed italic text-lg font-medium">
                 "{roast}"
               </p>
+              <motion.button
+  initial={{ opacity: 0 }}
+  animate={{ opacity: 1 }}
+  onClick={handleClear}
+  className="group relative flex items-center gap-2 px-6 py-3 mt-8 mx-auto bg-transparent border border-zinc-800 rounded-full text-zinc-500 hover:text-red-500 hover:border-red-500/50 transition-all duration-300"
+>
+  {/* The icon spins on hover */}
+  <motion.div className="group-hover:rotate-180 transition-transform duration-500">
+    <Trash2 size={16} />
+  </motion.div>
+  
+  <span className="text-xs font-bold uppercase tracking-widest">
+    Burn the Evidence & Try Again
+  </span>
+
+  {/* Subtle glow effect on hover */}
+  <div className="absolute inset-0 rounded-full bg-red-500/5 blur-xl opacity-0 group-hover:opacity-100 transition-opacity" />
+</motion.button>
             </motion.div>
           )}
         </AnimatePresence>

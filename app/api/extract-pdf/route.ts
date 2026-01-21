@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from 'next/server';
 const pdf = require('pdf-parse-fork');
 
 export async function POST(req: NextRequest) {
+
   try {
     const formData = await req.formData();
     const file = formData.get('file') as File;
@@ -23,4 +24,8 @@ export async function POST(req: NextRequest) {
     console.error("PDF Parsing Error:", error);
     return NextResponse.json({ error: "Failed to parse PDF" }, { status: 500 });
   }
+  // ... inside your POST function
+const data = await pdf(Buffer);
+console.log("EXTRACTED TEXT:", data.text); // <--- ADD THIS LINE
+return NextResponse.json({ text: data.text });
 }
