@@ -175,8 +175,8 @@ export default function HomeHub() {
 
           <p className="text-zinc-400 max-w-xl mx-auto text-lg mb-12">
             {vibe === 'chaos' 
-              ? "Enter the lab where resumes go to die and AI reigns supreme." 
-              : "A sanctuary for spiritual growth and creative harmony."}
+              ? "Experimental AI graveyard where ideas are born through destruction." 
+              : "A digital sanctuary for spiritual tech and calm interfaces."}
           </p>
         </header>
 
