@@ -1,7 +1,7 @@
 "use client";
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Layers2, Search, Wind, ScrollText, Sparkles } from 'lucide-react';
+import { Layers2, Search, Shell, ScrollText, Sparkles } from 'lucide-react';
 import Link from 'next/link';
 
 export default function VerseVoyager() {
@@ -84,13 +84,13 @@ export default function VerseVoyager() {
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && seekKnowledge()}
               placeholder="Speak from the heart..."
-              className="w-full bg-transparent border-b border-[#d4af37]/20 py-4 px-2 text-xl font-serif italic focus:outline-none focus:border-[#d4af37] transition-all placeholder:text-zinc-800 text-white text-center"
+              className="w-full bg-transparent border-b border-[#d4af37]/20 py-4 px-2 text-xl pr-12 pl-12 font-serif italic focus:outline-none focus:border-[#d4af37] transition-all placeholder:text-zinc-800 text-white text-center"
             />
             <button 
               onClick={() => seekKnowledge()}
               className="absolute right-0 bottom-4 text-[#d4af37] hover:scale-110 transition-transform cursor-pointer"
             >
-              {loading ? <Wind className="animate-spin" /> : <Search size={24} strokeWidth={1.5} />}
+              {loading ? <Shell className="animate-spin" /> : <Search size={24} strokeWidth={1.5} />}
             </button>
           </div>
         </div>
@@ -156,7 +156,7 @@ export default function VerseVoyager() {
                 transition={{ delay: 1 }}
                 className="bg-[#d4af37]/5 p-8 border border-[#d4af37]/10 text-center rounded-sm"
               >
-                <Sparkles size={16} className="mx-auto mb-4 text-[#d4af37]/40" />
+                
                 <p className="text-sm font-serif italic text-[#d4af37]/80 leading-relaxed max-w-md mx-auto">
                   {data.reflection}
                 </p>
