@@ -78,16 +78,6 @@ const PROJECTS = [
     date: "JAN 27",
     color: "from-cyan-500/20 to-blue-500/20"
   },
-  {
-    title: "Basirah Vision",
-    desc: "Neural-linked optical analysis. See the world through the AI eye.",
-    path: "/basirah",
-    icon: <Camera />, // Ensure Camera is imported from lucide-react
-    vibe: "peace",
-    status: "unlocked",
-    date: "JAN 27",
-    color: "from-cyan-500/20 to-blue-500/20"
-  },
   ...Array.from({ length: 25 }).map((_, i) => {
     const dayNumber = 28 + i;
     const isFeb = dayNumber > 31;
