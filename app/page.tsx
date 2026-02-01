@@ -3,7 +3,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
 // ADDED Database TO IMPORTS
-import { Fingerprint, Camera, Database, Briefcase, Zap, Target, Flame, Palette, Sparkles, ArrowRight, Github, Twitter, Lock, Cpu, Wand2, ScrollText } from 'lucide-react';
+import { Binary, Fingerprint, Camera, Database, Briefcase, Zap, Target, Flame, Palette, Sparkles, ArrowRight, Github, Twitter, Lock, Cpu, Wand2, ScrollText } from 'lucide-react';
 import ActivityTicker from '@/components/ActivityTicker';
 
 // 1. SCRAMBLE COMPONENT
@@ -120,13 +120,23 @@ const PROJECTS = [
     date: "LIVE",
     color: "from-[#bfff00]/20 to-zinc-900/20"
   },
-  ...Array.from({ length: 22 }).map((_, i) => {
-    const dayNumber = 31 + i;
+  {
+    title: "Vision Alchemist",
+    desc: "Upload a UI screenshot. AI transmutates pixels into production Tailwind code.",
+    path: "/vision",
+    icon: <Binary />,
+    vibe: "chaos",
+    status: "unlocked",
+    date: "DAY 10",
+    color: "from-lime-400/20 to-cyan-500/20"
+  },
+  ...Array.from({ length: 21 }).map((_, i) => {
+    const dayNumber = 33 + i;
     const isFeb = dayNumber > 31;
     const displayDate = isFeb ? `${dayNumber - 31} FEB` : `${dayNumber} JAN`;
     
     return {
-      title: `Project ${i + 9}`,
+      title: `Project ${i + 11}`,
       desc: "A classified AI experiment currently in development.",
       path: "#",
       icon: <Cpu />,
@@ -252,6 +262,7 @@ export default function HomeHub() {
           const isApplyFlow = project.title === "ApplyFlow";
           const isLedger = project.title === "Hunter's Ledger"; 
           const isMorphos = project.title === "Aura Morphos";
+          const isV10 = project.title === "Vision Alchemist";
           const isHidden = (vibe === 'chaos' && project.vibe === 'peace') || (vibe === 'peace' && project.vibe === 'chaos');
 
           return (
@@ -296,6 +307,18 @@ export default function HomeHub() {
                 </div>
               )}
 
+              {/* DAY 10 NEURAL RAIN EFFECT */}
+              {!isLocked && isV10 && (
+                <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-1000 pointer-events-none">
+                  <motion.div 
+                    animate={{ y: ["-100%", "100%"] }}
+                    transition={{ duration: 1.5, repeat: Infinity, ease: "linear" }}
+                    className="absolute inset-x-0 h-32 bg-gradient-to-b from-transparent via-lime-400/20 to-transparent"
+                  />
+                  <div className="absolute top-4 right-8 font-mono text-[8px] text-lime-400/40">ALCH_V2.0</div>
+                </div>
+              )}
+
               {/* ... Rest of your existing Auras (ApplyFlow, Aura, Basirah, etc.) ... */}
               {!isLocked && isApplyFlow && (
                 <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none overflow-hidden">
@@ -319,6 +342,7 @@ export default function HomeHub() {
                       isLedger ? 'group-hover:bg-emerald-500/10 group-hover:border-emerald-500/40 group-hover:text-emerald-400' :
                       isApplyFlow ? 'group-hover:bg-blue-500/10 group-hover:border-blue-500/50 group-hover:text-blue-400' :
                       isMorphos ? 'group-hover:bg-[#bfff00]/10 group-hover:border-[#bfff00]/40 group-hover:text-[#bfff00]' :
+                      isV10 ? 'group-hover:border-lime-400 group-hover:text-lime-400' :
                       'group-hover:border-orange-500/50'
                     )
                   }`}>
@@ -329,6 +353,7 @@ export default function HomeHub() {
                     !isLocked && (
                       isLedger ? 'group-hover:text-emerald-400' :
                       isMorphos ? 'group-hover:text-[#bfff00] font-serif italic' : 
+                      isV10 ? 'group-hover:text-lime-400' :
                       isApplyFlow ? 'group-hover:text-blue-400' : '' 
                     )
                   }`}>
