@@ -3,7 +3,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
 // ADDED Database TO IMPORTS
-import { Binary, Fingerprint, Camera, Database, Briefcase, Zap, Target, Flame, Palette, Sparkles, ArrowRight, Github, Twitter, Lock, Cpu, Wand2, ScrollText } from 'lucide-react';
+import { Activity, Binary, Fingerprint, Camera, Database, Briefcase, Zap, Target, Flame, Palette, Sparkles, ArrowRight, Github, Twitter, Lock, Cpu, Wand2, ScrollText } from 'lucide-react';
 import ActivityTicker from '@/components/ActivityTicker';
 
 // 1. SCRAMBLE COMPONENT
@@ -130,8 +130,18 @@ const PROJECTS = [
     date: "DAY 10",
     color: "from-lime-400/20 to-cyan-500/20"
   },
-  ...Array.from({ length: 21 }).map((_, i) => {
-    const dayNumber = 33 + i;
+  {
+    title: "Aura Tracker",
+    desc: "Neural-linked momentum forecasting. Predicting your next peak based on current frequency stability.",
+    path: "/aura-tracker", // This would be the new route for the visualizer
+    icon: <Activity />, 
+    vibe: "momentum",
+    status: "unlocked",
+    date: "DAY 11",
+    color: "from-[#bfff00]/20 to-emerald-900/20"
+  },
+  ...Array.from({ length: 20 }).map((_, i) => {
+    const dayNumber = 34 + i;
     const isFeb = dayNumber > 31;
     const displayDate = isFeb ? `${dayNumber - 31} FEB` : `${dayNumber} JAN`;
     
@@ -146,6 +156,7 @@ const PROJECTS = [
       color: "from-zinc-500/10 to-zinc-800/10"
     };
   })
+  
 ];
 
 export default function HomeHub() {
@@ -318,6 +329,8 @@ export default function HomeHub() {
                   <div className="absolute top-4 right-8 font-mono text-[8px] text-lime-400/40">ALCH_V2.0</div>
                 </div>
               )}
+
+              
 
               {/* ... Rest of your existing Auras (ApplyFlow, Aura, Basirah, etc.) ... */}
               {!isLocked && isApplyFlow && (
