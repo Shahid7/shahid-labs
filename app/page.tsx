@@ -3,7 +3,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
 // ADDED Database TO IMPORTS
-import { Activity, Binary, Fingerprint, Camera, Database, Briefcase, Zap, Target, Flame, Palette, Sparkles, ArrowRight, Github, Twitter, Lock, Cpu, Wand2, ScrollText, Radio } from 'lucide-react';
+import { Activity, ShieldCheck, Binary, Fingerprint, Camera, Database, Briefcase, Zap, Target, Flame, Palette, Sparkles, ArrowRight, Github, Twitter, Lock, Cpu, Wand2, ScrollText, Radio } from 'lucide-react';
 import ActivityTicker from '@/components/ActivityTicker';
 
 // 1. SCRAMBLE COMPONENT
@@ -140,13 +140,23 @@ const PROJECTS = [
     date: "DAY 11",
     color: "from-[#bfff00]/20 to-emerald-900/20"
   },
-  ...Array.from({ length: 20 }).map((_, i) => {
-    const dayNumber = 36 + i;
+  {
+    title: "Aura Gate",
+    desc: "Neural firewall & system integrity audit. Track breaches and maintain peak cognitive momentum.",
+    path: "/aura-gate", 
+    icon: <ShieldCheck />,
+    vibe: "momentum",
+    status: "unlocked",
+    date: "DAY 12",
+    color: "from-[#bfff00]/20 to-zinc-900/20"
+  },
+  ...Array.from({ length: 18 }).map((_, i) => {
+    const dayNumber = 38 + i;
     const isFeb = dayNumber > 31;
     const displayDate = isFeb ? `${dayNumber - 31} FEB` : `${dayNumber} JAN`;
     
     return {
-      title: `Project ${i + 12}`,
+      title: `Project ${i + 13}`,
       desc: "A classified AI experiment currently in development.",
       path: "#",
       icon: <Cpu />,
@@ -274,7 +284,8 @@ export default function HomeHub() {
           const isLedger = project.title === "Hunter's Ledger"; 
           const isMorphos = project.title === "Aura Morphos";
           const isV10 = project.title === "Vision Alchemist";
-          const isFocusAura = project.title === "Focus-Aura"; // NEW FOR DAY 11
+          const isFocusAura = project.title === "Focus-Aura"; 
+          const isAuraGate = project.title === "Aura Gate";
           const isHidden = (vibe === 'chaos' && project.vibe === 'peace') || (vibe === 'peace' && project.vibe === 'chaos');
 
           return (
@@ -306,7 +317,34 @@ export default function HomeHub() {
                 </div>
               )}
 
-              {/* LEDGER DATA FLOW AURA (NEW) */}
+              {/* AURA-GATE SYSTEM INTEGRITY EFFECT (DAY 12) */}
+{!isLocked && isAuraGate && (
+  <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none overflow-hidden">
+    {/* Scanning Bar */}
+    <motion.div 
+      animate={{ y: ["0%", "400%"] }}
+      transition={{ duration: 4, repeat: Infinity, ease: "linear" }}
+      className="absolute inset-x-0 h-[1px] bg-[#bfff00] shadow-[0_0_15px_#bfff00] z-20"
+    />
+    {/* Grid Overlay */}
+    <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_transparent_0%,_rgba(5,5,5,0.8)_100%)] z-10" />
+    <div className="absolute bottom-4 right-6 flex flex-col items-end gap-1">
+      <div className="flex gap-1">
+        {[...Array(4)].map((_, i) => (
+          <motion.div 
+            key={i}
+            animate={{ opacity: [0.2, 1, 0.2] }}
+            transition={{ duration: 1, delay: i * 0.2, repeat: Infinity }}
+            className="w-1 h-3 bg-[#bfff00]"
+          />
+        ))}
+      </div>
+      <span className="font-mono text-[7px] text-[#bfff00] tracking-tighter uppercase">Integrity_Secure</span>
+    </div>
+  </div>
+)}
+
+              {/* LEDGER DATA FLOW AURA */}
               {!isLocked && isLedger && (
                 <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none">
                   <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/10 blur-[50px] rounded-full" />
@@ -371,6 +409,7 @@ export default function HomeHub() {
                       isMorphos ? 'group-hover:bg-[#bfff00]/10 group-hover:border-[#bfff00]/40 group-hover:text-[#bfff00]' :
                       isV10 ? 'group-hover:border-lime-400 group-hover:text-lime-400' :
                       isFocusAura ? 'group-hover:bg-[#bfff00]/10 group-hover:border-[#bfff00]/50 group-hover:text-[#bfff00]' :
+                      isAuraGate ? 'group-hover:bg-[#bfff00]/10 group-hover:border-[#bfff00]/50 group-hover:text-[#bfff00]' : 
                       'group-hover:border-orange-500/50'
                     )
                   }`}>
@@ -383,12 +422,14 @@ export default function HomeHub() {
                       isMorphos ? 'group-hover:text-[#bfff00] font-serif italic' : 
                       isV10 ? 'group-hover:text-lime-400' :
                       isFocusAura ? 'group-hover:text-[#bfff00]' :
+                      isAuraGate ? 'group-hover:text-[#bfff00] font-black italic' : 
                       isApplyFlow ? 'group-hover:text-blue-400' : '' 
                     )
                   }`}>
                     {project.title} 
                     {!isLocked && <ArrowRight size={18} className={`opacity-0 -translate-x-2 group-hover:opacity-100 group-hover:translate-x-0 transition-all ${
                       isMorphos || isFocusAura ? 'text-[#bfff00]' :
+                      isAuraGate ? 'text-[#bfff00]' :
                       isLedger ? 'text-emerald-500' : 'text-orange-500' 
                     }`} />}
                   </h3>
