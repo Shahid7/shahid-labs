@@ -83,6 +83,16 @@ export default function AuraTerminal() {
     } catch (e) { console.error("Audio blocked"); }
   };
 
+  const addLog = (message: string) => {
+    const logs = JSON.parse(localStorage.getItem('terminal_logs') || "[]");
+    const timestamp = new Date().toLocaleTimeString();
+    const newLog = `[${timestamp}] ${message}`;
+    
+    // Keep only the last 20 logs to save memory
+    const updatedLogs = [newLog, ...logs].slice(0, 20);
+    localStorage.setItem('terminal_logs', JSON.stringify(updatedLogs));
+  };
+
   // 2. EXTENSION HEARTBEAT (Detect Disabling)
   useEffect(() => {
     const EXTENSION_ID = "ombhpldfkdlnbhlgoflejijbhoiiomff"; // Get this from chrome://extensions
@@ -147,8 +157,12 @@ export default function AuraTerminal() {
       
       response = `REPORT: Aura_${Number(currentScore).toFixed(1)}/10 | Link_${isLinkStable ? 'ACTIVE' : 'OFFLINE'}`;
     } else if (cmd === "/logs") {
-      const breaches = JSON.parse(localStorage.getItem('aura_breaches') || "[]");
-      response = breaches.length > 0 ? `LOGS: ${breaches.slice(-3).join(" | ")}` : "SYSTEM_CLEAN: No breaches.";
+      const logs = JSON.parse(localStorage.getItem('terminal_logs') || "[]");
+      if (logs.length === 0) {
+        response = "SYSTEM_LOGS_EMPTY: No data recorded.";
+      } else {
+        // Join the logs with newlines for a terminal list view
+        response = logs.join("\n");}
     } else if (cmd.startsWith("/focus")) {
       const mins = parseInt(cmd.split(" ")[1]) || 25;
       setFocusTime(mins * 60);
