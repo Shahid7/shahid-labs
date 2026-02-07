@@ -151,30 +151,36 @@ export default function AuraTerminal() {
       response = `NEURAL_LOCK_START: Timer set to ${mins}m. Access Restricted.`;
     } else if (cmd.startsWith("/lock")) {
       const site = cmd.split(" ")[1];
-      const EXTENSION_ID = "YOUR_EXTENSION_ID_HERE"; // <--- DOUBLE CHECK THIS ID
+      const EXTENSION_ID = "YOUR_ACTUAL_EXTENSION_ID"; // <--- DOUBLE CHECK THIS
 
       if (!site) {
         response = "ERR: Usage /lock [site.com]";
       } else {
-        // Direct link to the Extension's Background Script
-        if (typeof window !== 'undefined' && (window as any).chrome?.runtime) {
-          (window as any).chrome.runtime.sendMessage(
-            EXTENSION_ID, 
-            { action: "addDynamicRule", site: site }, 
-            (res: any) => {
-              if ((window as any).chrome.runtime.lastError) {
-                console.error("Lock Fail:", (window as any).chrome.runtime.lastError.message);
-              } else {
-                console.log("Extension Response:", res);
+        try {
+          // 1. Check if we are in a browser and chrome extension API exists
+          const isChromeAvailable = typeof window !== 'undefined' && (window as any).chrome?.runtime;
+
+          if (isChromeAvailable) {
+            (window as any).chrome.runtime.sendMessage(
+              EXTENSION_ID,
+              { action: "addDynamicRule", site: site },
+              (res: any) => {
+                // This callback is async, it won't block the UI
+                if ((window as any).chrome.runtime.lastError) {
+                  console.error("Neural Link Error:", (window as any).chrome.runtime.lastError.message);
+                }
               }
-            }
-          );
-          response = `SIGNAL_SENT: Neural Firewall locking ${site}...`;
-        } else {
-          response = "ERR: Chrome Runtime not found. Check Extension.";
+            );
+            response = `SIGNAL_SENT: Neural Firewall locking ${site}...`;
+          } else {
+            response = "ERR: NEURAL_LINK_NOT_FOUND. Is the extension installed?";
+          }
+        } catch (err) {
+          console.error("Lock Crash:", err);
+          response = "ERR: INTERNAL_COMMUNICATION_FAULT.";
         }
-      }
-    } else if (cmd === "/clear") {
+      } 
+    }else if (cmd === "/clear") {
       setHistory([]); setInput(''); return;
     } else {
       response = `ERR: Unknown command '${cmd}'`;
