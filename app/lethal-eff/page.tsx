@@ -151,7 +151,7 @@ export default function AuraTerminal() {
       response = `NEURAL_LOCK_START: Timer set to ${mins}m. Access Restricted.`;
     } else if (cmd.startsWith("/lock")) {
       const site = cmd.split(" ")[1];
-      const EXTENSION_ID = "YOUR_ACTUAL_EXTENSION_ID"; // <--- DOUBLE CHECK THIS
+      const EXTENSION_ID = "ombhpldfkdlnbhlgoflejijbhoiiomff"; // <--- DOUBLE CHECK THIS
 
       if (!site) {
         response = "ERR: Usage /lock [site.com]";
