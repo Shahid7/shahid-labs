@@ -151,10 +151,28 @@ export default function AuraTerminal() {
       response = `NEURAL_LOCK_START: Timer set to ${mins}m. Access Restricted.`;
     } else if (cmd.startsWith("/lock")) {
       const site = cmd.split(" ")[1];
-      if (!site) response = "ERR: Usage /lock [site.com]";
-      else {
-        window.postMessage({ type: "AURA_LOCK_CMD", site }, "*");
-        response = `SIGNAL_SENT: Firewall locking ${site}`;
+      const EXTENSION_ID = "YOUR_EXTENSION_ID_HERE"; // <--- DOUBLE CHECK THIS ID
+
+      if (!site) {
+        response = "ERR: Usage /lock [site.com]";
+      } else {
+        // Direct link to the Extension's Background Script
+        if (typeof window !== 'undefined' && (window as any).chrome?.runtime) {
+          (window as any).chrome.runtime.sendMessage(
+            EXTENSION_ID, 
+            { action: "addDynamicRule", site: site }, 
+            (res: any) => {
+              if ((window as any).chrome.runtime.lastError) {
+                console.error("Lock Fail:", (window as any).chrome.runtime.lastError.message);
+              } else {
+                console.log("Extension Response:", res);
+              }
+            }
+          );
+          response = `SIGNAL_SENT: Neural Firewall locking ${site}...`;
+        } else {
+          response = "ERR: Chrome Runtime not found. Check Extension.";
+        }
       }
     } else if (cmd === "/clear") {
       setHistory([]); setInput(''); return;
