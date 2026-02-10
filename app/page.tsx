@@ -3,7 +3,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
 // ADDED Database TO IMPORTS
-import { Activity, Terminal, ShieldCheck, Binary, Fingerprint, Camera, Database, Briefcase, Zap, Target, Flame, Palette, Sparkles, ArrowRight, Github, Twitter, Lock, Cpu, Wand2, ScrollText, Radio } from 'lucide-react';
+import { HeartPulse, Activity, Terminal, ShieldCheck, Binary, Fingerprint, Camera, Database, Briefcase, Zap, Target, Flame, Palette, Sparkles, ArrowRight, Github, Twitter, Lock, Cpu, Wand2, ScrollText, Radio } from 'lucide-react';
 import ActivityTicker from '@/components/ActivityTicker';
 
 // 1. SCRAMBLE COMPONENT
@@ -160,13 +160,33 @@ const PROJECTS = [
     date: "DAY 13",
     color: "from-[#bfff00]/20 to-zinc-900/20"
   },
-  ...Array.from({ length: 17 }).map((_, i) => {
-    const dayNumber = 40 + i;
+  {
+    title: "Pulse",
+    desc: "Biometric momentum tracker. Sync your internal rhythm with project velocity.",
+    path: "/pulse",
+    icon: <HeartPulse />,
+    vibe: "peace",
+    status: "unlocked",
+    date: "DAY 14",
+    color: "from-[#bfff00]/20 to-rose-900/20"
+  },
+  {
+    title: "Stress Smasher",
+    desc: "Kinetic destruction lab. Smash geometry, slow down time, and erase your stress through physics-based chaos.",
+    path: "/stress-smasher",
+    icon: <Activity />, // Representing the kinetic energy
+    vibe: "chaos",
+    status: "unlocked",
+    date: "DAY 15",
+    color: "from-[#bfff00]/20 to-red-500/10"
+  },
+  ...Array.from({ length: 15 }).map((_, i) => {
+    const dayNumber = 42 + i;
     const isFeb = dayNumber > 31;
     const displayDate = isFeb ? `${dayNumber - 31} FEB` : `${dayNumber} JAN`;
     
     return {
-      title: `Project ${i + 14}`,
+      title: `Project ${i + 16}`,
       desc: "A classified AI experiment currently in development.",
       path: "#",
       icon: <Cpu />,
@@ -296,7 +316,9 @@ export default function HomeHub() {
           const isV10 = project.title === "Vision Alchemist";
           const isFocusAura = project.title === "Focus-Aura"; 
           const isAuraGate = project.title === "Aura Gate";
-          const isLethalEff = project.title === "Lethal Eff"
+          const isLethalEff = project.title === "Lethal Eff";
+          const isPulse = project.title === "Pulse";
+          const isStressSmasher = project.title === "Stress Smasher";
           const isHidden = (vibe === 'chaos' && project.vibe === 'peace') || (vibe === 'peace' && project.vibe === 'chaos');
 
           return (
@@ -376,6 +398,48 @@ export default function HomeHub() {
   </div>
 )}
 
+{/* AURA-PULSE HEARTBEAT EFFECT (DAY 14) */}
+{!isLocked && isPulse && (
+                <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none">
+                  <motion.div 
+                    animate={{ scale: [0.9, 1.1, 0.9], opacity: [0.1, 0.2, 0.1] }}
+                    transition={{ duration: 0.8, repeat: Infinity, ease: "easeInOut" }}
+                    className="absolute inset-0 bg-rose-500/20 blur-3xl"
+                  />
+                </div>
+              )}
+
+              {/* STRESS SMASHER KINETIC SHATTER (DAY 15) */}
+{!isLocked && isStressSmasher && (
+  <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none overflow-hidden">
+    {/* Impact Ripples */}
+    {[...Array(2)].map((_, i) => (
+      <motion.div 
+        key={i}
+        animate={{ scale: [1, 2.5], opacity: [0.5, 0] }}
+        transition={{ duration: 0.8, repeat: Infinity, delay: i * 0.4 }}
+        className="absolute inset-0 border-2 border-[#bfff00]/30 rounded-full"
+      />
+    ))}
+    {/* Flying Shards */}
+    {[...Array(6)].map((_, i) => (
+      <motion.div
+        key={`shard-${i}`}
+        initial={{ x: 0, y: 0, opacity: 0 }}
+        animate={{ 
+          x: (i % 2 === 0 ? 1 : -1) * (Math.random() * 100 + 50), 
+          y: (Math.random() - 0.5) * 200,
+          rotate: 360,
+          opacity: [0, 1, 0]
+        }}
+        transition={{ duration: 1, repeat: Infinity, delay: i * 0.1 }}
+        className="absolute top-1/2 left-1/2 w-2 h-2 bg-[#bfff00] rounded-sm"
+      />
+    ))}
+    <div className="absolute bottom-4 left-8 font-mono text-[7px] text-red-500 tracking-[0.3em] uppercase animate-pulse">Impact_Detected</div>
+  </div>
+)}
+
               {/* LEDGER DATA FLOW AURA */}
               {!isLocked && isLedger && (
                 <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none">
@@ -442,6 +506,7 @@ export default function HomeHub() {
                       isV10 ? 'group-hover:border-lime-400 group-hover:text-lime-400' :
                       isFocusAura ? 'group-hover:bg-[#bfff00]/10 group-hover:border-[#bfff00]/50 group-hover:text-[#bfff00]' :
                       isAuraGate ? 'group-hover:bg-[#bfff00]/10 group-hover:border-[#bfff00]/50 group-hover:text-[#bfff00]' : 
+                      isPulse ? 'group-hover:bg-rose-500/10 group-hover:border-rose-500/50 group-hover:text-rose-400' :
                       'group-hover:border-orange-500/50'
                     )
                   }`}>
@@ -456,6 +521,7 @@ export default function HomeHub() {
                       isFocusAura ? 'group-hover:text-[#bfff00]' :
                       isAuraGate ? 'group-hover:text-[#bfff00] font-black italic' : 
                       isLethalEff ? 'group-hover:text-[#bfff00] font-mono uppercase tracking-tighter' : 
+                      isStressSmasher ? 'group-hover:bg-[#bfff00]/10 group-hover:border-[#bfff00]/50 group-hover:text-[#bfff00] group-hover:rotate-12' :
                       isApplyFlow ? 'group-hover:text-blue-400' : '' 
                     )
                   }`}>
@@ -464,6 +530,8 @@ export default function HomeHub() {
                       isMorphos || isFocusAura ? 'text-[#bfff00]' :
                       isAuraGate ? 'text-[#bfff00]' :
                       isLethalEff ? 'text-[#bfff00]' : 
+                      isPulse ? 'text-rose-500' :
+                      isStressSmasher ? 'group-hover:text-[#bfff00] group-hover:scale-105' :
                       isLedger ? 'text-emerald-500' : 'text-orange-500' 
                     }`} />}
                   </h3>
