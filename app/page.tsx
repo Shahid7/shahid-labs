@@ -180,13 +180,23 @@ const PROJECTS = [
     date: "DAY 15",
     color: "from-[#bfff00]/20 to-red-500/10"
   },
-  ...Array.from({ length: 15 }).map((_, i) => {
-    const dayNumber = 42 + i;
+  {
+    title: "Glitch Auth",
+    desc: "Pattern encryption. A behavioral vault where your unique physics-signature is the only key.",
+    path: "/glitch",
+    icon: <Lock />, 
+    vibe: "chaos",
+    status: "unlocked",
+    date: "DAY 16",
+    color: "from-red-600/20 to-zinc-900/20"
+  },
+  ...Array.from({ length: 14 }).map((_, i) => {
+    const dayNumber = 43 + i;
     const isFeb = dayNumber > 31;
     const displayDate = isFeb ? `${dayNumber - 31} FEB` : `${dayNumber} JAN`;
     
     return {
-      title: `Project ${i + 16}`,
+      title: `Project ${i + 17}`,
       desc: "A classified AI experiment currently in development.",
       path: "#",
       icon: <Cpu />,
@@ -319,6 +329,7 @@ export default function HomeHub() {
           const isLethalEff = project.title === "Lethal Eff";
           const isPulse = project.title === "Pulse";
           const isStressSmasher = project.title === "Stress Smasher";
+          const isGlitchAuth = project.title === "Glitch Auth";
           const isHidden = (vibe === 'chaos' && project.vibe === 'peace') || (vibe === 'peace' && project.vibe === 'chaos');
 
           return (
@@ -439,6 +450,28 @@ export default function HomeHub() {
     <div className="absolute bottom-4 left-8 font-mono text-[7px] text-red-500 tracking-[0.3em] uppercase animate-pulse">Impact_Detected</div>
   </div>
 )}
+              {/* STRESS SMASHER KINETIC SHATTER (DAY 16) */}
+              {!isLocked && isGlitchAuth && (
+                <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none">
+                  <div className="absolute inset-0 bg-[repeating-linear-gradient(0deg,transparent,transparent_2px,rgba(255,0,0,0.05)_3px)]" />
+                  <motion.div 
+                    animate={{ x: [-2, 2, -1, 0] }}
+                    transition={{ repeat: Infinity, duration: 0.2 }}
+                    className="absolute top-4 right-6 font-mono text-[8px] text-red-500 font-black uppercase"
+                  >
+                    UNAUTHORIZED_ACCESS_DETECTED
+                  </motion.div>
+                  <div className="absolute inset-0 flex items-center justify-center">
+                      <motion.div 
+                          animate={{ scale: [1, 1.1, 1], opacity: [0.3, 0.6, 0.3] }}
+                          transition={{ repeat: Infinity, duration: 1 }}
+                          className="w-32 h-32 border border-red-500/30 rounded-full flex items-center justify-center"
+                      >
+                          <div className="w-16 h-16 border border-red-500/50 rounded-full animate-ping" />
+                      </motion.div>
+                  </div>
+                </div>
+              )}
 
               {/* LEDGER DATA FLOW AURA */}
               {!isLocked && isLedger && (
