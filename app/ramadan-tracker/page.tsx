@@ -459,7 +459,7 @@ const iftarDate = new Date(nowInCity.getFullYear(), nowInCity.getMonth(), nowInC
   if (isLoginView) return (
     <div className="min-h-screen bg-[#F5F5F0] flex items-center justify-center p-6 text-[#2D2D2A]">
       <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="bg-white border-2 border-[#2D2D2A] p-12 w-full max-w-md shadow-[12px_12px_0px_#2D2D2A]">
-        <h2 className="text-2xl font-black italic uppercase mb-8">Vault_Gate</h2>
+        <h2 className="text-2xl font-black italic uppercase mb-8">Ramadan Tracker</h2>
         <form onSubmit={(e) => { e.preventDefault(); if(tempName) loadUserData(tempName); }}>
           <input className="w-full bg-transparent border-b-2 border-[#2D2D2A] p-3 outline-none font-black text-3xl uppercase mb-8" placeholder="NAME" value={tempName} onChange={(e) => setTempName(e.target.value)} />
           <button className="w-full bg-[#2D2D2A] text-white py-4 font-black uppercase text-xs">Connect</button>
