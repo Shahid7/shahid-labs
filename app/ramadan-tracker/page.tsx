@@ -564,7 +564,7 @@ const iftarDate = new Date(nowInCity.getFullYear(), nowInCity.getMonth(), nowInC
         </div>
       </div>
 
-<div className="fixed bottom-4 left-4 z-[1000] flex gap-2">
+{/* <div className="fixed bottom-4 left-4 z-[1000] flex gap-2">
   <button 
     onClick={() => setShowIftarMubarak(true)} 
     className="bg-orange-500 text-white p-2 text-[8px] font-black uppercase rounded"
@@ -584,7 +584,7 @@ const iftarDate = new Date(nowInCity.getFullYear(), nowInCity.getMonth(), nowInC
 >
   Force Checkmark
 </button>
-</div>
+</div> */}
       <main className="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-12">
       <section className="lg:col-span-7">
         <div className="border-2 p-16 text-center rounded-[3rem] relative flex items-center justify-center min-h-[500px]" style={{ borderColor: theme.text }}>
