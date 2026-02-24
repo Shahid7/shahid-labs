@@ -3,9 +3,11 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence, useAnimation } from 'framer-motion';
 import { 
-  Sparkles, Check, LogOut, X, Sunrise, Sunset, 
+  ArrowRight, AlertCircle, Check, LogOut, X, Sunrise, Sunset, 
   Moon, Volume2, VolumeX, BookOpen, Quote, Search, Info, AlertTriangle, ScrollText, CheckCircle2
 } from 'lucide-react';
+import { createClient } from '@supabase/supabase-js';
+
 
 // --- MINGORA 2026 FULL CALENDAR (Feb 19 - Mar 19) ---
 const MINGORA_TIMINGS: Record<string, { sehar: string; iftar: string }> = {
@@ -106,6 +108,7 @@ const DAILY_AYATS = [
   { arabic: "وَقُل رَّبِّ زِدْنِي عِلْمًا", ref: "Ta-Ha 20:114", trans: "And say, 'My Lord, increase me in knowledge.'" }
 ];
 
+
 export default function QamarFinal() {
   const [localTime, setLocalTime] = useState("");
   const [user, setUser] = useState<{name: string} | null>(null);
@@ -121,7 +124,7 @@ export default function QamarFinal() {
   const [cityInput, setCityInput] = useState("");
   const [isExternalCity, setIsExternalCity] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
-
+  const [isRegistering, setIsRegistering] = useState(false);
   const [theme, setTheme] = useState({ bg: "#F5F5F0", text: "#2D2D2A", mode: "Day" });
   const [cd, setCd] = useState({ h: "00", m: "00", s: "00", label: "", progress: 0, sehar: "--:--", iftar: "--:--", timezone: "Asia/Karachi" });
   const [count, setCount] = useState(0);
@@ -132,13 +135,111 @@ export default function QamarFinal() {
   const [checkedItems, setCheckedItems] = useState<string[]>([]);
   const [fastingLog, setFastingLog] = useState<string[]>([]); // Array of dates like ["2026-02-19"]
   const orbControls = useAnimation();
-  
+  const [suggestion, setSuggestion] = useState<string | null>(null);
+  const [showSuggestionPopup, setShowSuggestionPopup] = useState(false);
+  const [tempPass, setTempPass] = useState(""); 
+  const [celebrated, setCelebrated] = useState(false);
+  const supabase = createClient('https://rqcbplnanidhqiwpgzrn.supabase.co', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJxY2JwbG5hbmlkaHFpd3BnenJuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk3NDEzNzEsImV4cCI6MjA4NTMxNzM3MX0.aikDCClbrh7F5V68uyjUlCuZotedUkeYwdzv8fnvEbA');
   const logout = () => {
     localStorage.removeItem('q_active_session');
     setUser(null);
     setCount(0); // Reset UI state
     setFastingLog([]); // Reset UI state
     setIsLoginView(true);
+  };
+
+  const handleAuth = async () => {
+    if (!tempName || !tempPass) return alert("Fill all fields");
+    const cleanName = tempName.toLowerCase().trim();
+    setAuthLoading(true);
+  
+    // 1. IMPROVED GEO-FETCH
+    let userCity = "Unknown City";
+    try {
+      // Try primary service
+      const geoRes = await fetch('https://ipapi.co/json/').catch(() => null);
+      if (geoRes && geoRes.ok) {
+        const geoData = await geoRes.json();
+        userCity = geoData.city || "Unknown City";
+      } else {
+        // Fallback service if first one fails
+        const backupRes = await fetch('http://ip-api.com/json/').catch(() => null);
+        if (backupRes && backupRes.ok) {
+          const backupData = await backupRes.json();
+          userCity = backupData.city || "Unknown City";
+        }
+      }
+    } catch (err) {
+      userCity = "Mingora (Est)"; // Default fallback for your region
+    }
+  
+    if (isRegistering) {
+      // --- REGISTRATION LOGIC ---
+  
+      // 2. CHECK IF NAME IS TAKEN BY ANYONE (Regardless of Password)
+      const { data: similarUsers } = await supabase
+        .from('user_vaults')
+        .select('user_name')
+        .ilike('user_name', `${cleanName}%`);
+  
+      const nameExists = similarUsers?.find(u => u.user_name === cleanName);
+  
+      if (nameExists) {
+        // 3. GENERATE UNIQUE SUGGESTION (Checks against all existing names)
+        const existingNames = similarUsers?.map(u => u.user_name) || [];
+        let counter = 1;
+        let newSug = `${cleanName}${counter}`;
+        
+        // Keep incrementing until we find a name NOT in the list
+        while (existingNames.includes(newSug)) {
+          counter++;
+          newSug = `${cleanName}${counter}`;
+        }
+  
+        setSuggestion(newSug);
+        setShowSuggestionPopup(true);
+        setAuthLoading(false);
+        return;
+      }
+  
+      // 4. CREATE NEW VAULT
+      const { error: insertError } = await supabase.from('user_vaults').insert([{
+        user_name: cleanName,
+        password: tempPass,
+        tasbeeh_count: 0,
+        fasting_days: ["2026-02-19", "2026-02-20", "2026-02-21"],
+        last_active: new Date().toISOString(),
+        last_location: userCity
+      }]);
+  
+      if (!insertError) {
+        await loadUserData(cleanName, tempPass);
+      } else {
+        alert("Registration failed. Please try a different name.");
+        setAuthLoading(false);
+      }
+  
+    } else {
+      // --- LOGIN LOGIC ---
+      const { data: vault } = await supabase
+        .from('user_vaults')
+        .select('*')
+        .eq('user_name', cleanName)
+        .eq('password', tempPass)
+        .single();
+  
+      if (!vault) {
+        alert("Invalid Identity or Pass-Key.");
+        setAuthLoading(false);
+      } else {
+        // Update location and time on login
+        await supabase.from('user_vaults')
+          .update({ last_active: new Date().toISOString(), last_location: userCity })
+          .eq('id', vault.id);
+          
+        await loadUserData(cleanName, tempPass);
+      }
+    }
   };
   
   useEffect(() => {
@@ -337,17 +438,19 @@ const seharDate = new Date(nowInCity.getFullYear(), nowInCity.getMonth(), nowInC
 const iftarDate = new Date(nowInCity.getFullYear(), nowInCity.getMonth(), nowInCity.getDate(), iH, iM);
 
     
-  if (diff <= 1000 && diff > 0) {
-    if (label === "UNTIL IFTAR") {
-      setShowIftarMubarak(true);
-      setTimeout(() => setShowIftarMubarak(false), 8000); // Show for 8 seconds
-      playTone(523, 'sine', 1); // Celebration tone
-    } else if (label === "UNTIL SEHAR") {
-      setShowSeharMubarak(true);
-      setTimeout(() => setShowSeharMubarak(false), 8000);
-      playTone(659, 'sine', 1);
-    }
-  }}
+if (diff <= 2000 && diff > -2000 && !celebrated) {
+  if (label === "UNTIL IFTAR") {
+    setCelebrated(true);
+    setShowIftarMubarak(true);
+    setTimeout(() => { setShowIftarMubarak(false); setCelebrated(false); }, 8000);
+    playTone(523, 'sine', 1);
+  } else if (label === "UNTIL SEHAR") {
+    setCelebrated(true);
+    setShowSeharMubarak(true);
+    setTimeout(() => { setShowSeharMubarak(false); setCelebrated(false); }, 8000);
+    playTone(659, 'sine', 1);
+  }
+}}
 
     setCd(prev => ({
       ...prev,
@@ -390,80 +493,284 @@ const iftarDate = new Date(nowInCity.getFullYear(), nowInCity.getMonth(), nowInC
     // updateEngine();
     if (!hasInitialized.current) {
       const session = localStorage.getItem('q_active_session');
-      if (session) loadUserData(session);
+      const savedPass = localStorage.getItem('q_active_pass'); // Get the password too
+      if (session && savedPass) loadUserData(session, savedPass);
+      // Only auto-login if both exist
+    if (session && savedPass) {
+      loadUserData(session, savedPass); 
+    }
       hasInitialized.current = true;
     }
     return () => clearInterval(timer);
   }, [updateEngine]);
 
-  const loadUserData = (name: string) => {
-    const key = `q_vault_${name.toLowerCase().trim()}`;
-    const data = localStorage.getItem(key);
-    const now = new Date();
-    const dateStr = now.toISOString().split('T')[0];
-    
-    // 1. Parse existing data or create default
-    let p = data ? JSON.parse(data) : { count: 0, quran: 0, checks: [], log: [] };
-    
-    // 2. Handle the Log (Days checked)
-    const launchBonusDays = ["2026-02-19", "2026-02-20", "2026-02-21"];
-    const existingLog = Array.isArray(p.log) ? p.log : [];
-    
-    // Merge bonus days + existing days
-    let updatedLog = Array.from(new Set([...existingLog, ...launchBonusDays]));
-  
-    // 3. AUTO-CHECK DAY 4 (If after Iftar)
-    const timings = MINGORA_TIMINGS[dateStr];
-    if (timings) {
-      const [iH, iM] = timings.iftar.split(':').map(Number);
-      const iftarTime = new Date(now.getFullYear(), now.getMonth(), now.getDate(), iH, iM);
-  
-      if (now > iftarTime && !updatedLog.includes(dateStr)) {
-        updatedLog.push(dateStr);
-        console.log("Day 4 Auto-Logged: Iftar has passed.");
-      }
-    }
-  
-    // 4. Update the Count based on the Log length
-    const newCount = updatedLog.length;
-  
-    // 5. Update States
-    setCount(newCount); 
-    setQuranProgress(p.quran || 0);
-    setCheckedItems(p.checks || []);
-    setFastingLog(updatedLog);
-    setUser({ name });
-  
-    // 6. Persist to LocalStorage immediately
-    const finalData = { 
-      ...p, 
-      count: newCount, 
-      log: updatedLog 
-    };
-    localStorage.setItem(key, JSON.stringify(finalData));
-    localStorage.setItem('q_active_session', name);
-  
-    // 7. UI Transitions
-    setIsLoginView(false);
-    setShowWelcome(true);
-    setTimeout(() => setShowWelcome(false), 2500);
-  };
+  const [authLoading, setAuthLoading] = useState(false);
 
-  const sync = (payload: any) => {
-    if (!user) return;
-    const key = `q_vault_${user.name.toLowerCase().trim()}`;
-    const current = JSON.parse(localStorage.getItem(key) || '{}');
-    localStorage.setItem(key, JSON.stringify({ ...current, ...payload }));
+const loadUserData = async (name: string, passwordInput: string) => {
+  setAuthLoading(true);
+  const cleanName = name.toLowerCase().trim();
+  
+  // 1. LOOK FOR EXACT MATCH (Name AND Password)
+  let { data: vault, error } = await supabase
+    .from('user_vaults')
+    .select('*')
+    .eq('user_name', cleanName)
+    .eq('password', passwordInput) // Check both at once
+    .single();
+
+  if (!vault) {
+    // 2. CHECK IF NAME IS TAKEN BY SOMEONE ELSE
+    let { data: nameCheck } = await supabase
+      .from('user_vaults')
+      .select('user_name')
+      .eq('user_name', cleanName)
+      .single();
+
+    if (nameCheck) {
+      alert("This name is already registered. Please use your correct password or a different name.");
+      setAuthLoading(false);
+      return;
+    }
+
+    // 3. REGISTER NEW USER (If name doesn't exist at all)
+    const { data: newUser } = await supabase
+      .from('user_vaults')
+      .insert([{ 
+        user_name: cleanName, 
+        password: passwordInput,
+        tasbeeh_count: 0,
+        fasting_days: ["2026-02-19", "2026-02-20", "2026-02-21", "2026-02-22", "2026-02-23"] // Bonus days
+      }])
+      .select().single();
+    vault = newUser;
+  }
+
+  // 4. PREPARE DATA (Your Mingora Logic)
+  const now = new Date();
+  const dateStr = now.toISOString().split('T')[0];
+  let updatedLog = [...(vault.fasting_days || [])];
+
+  const timings = MINGORA_TIMINGS[dateStr];
+  if (timings) {
+    const [iH, iM] = timings.iftar.split(':').map(Number);
+    const iftarTime = new Date(now.getFullYear(), now.getMonth(), now.getDate(), iH, iM);
+    if (now > iftarTime && !updatedLog.includes(dateStr)) {
+      updatedLog.push(dateStr);
+    }
+  }
+
+  // 5. FINALIZE UI
+  setCount(vault.tasbeeh_count);
+  setFastingLog(updatedLog);
+  setQuranProgress(vault.quran_progress || 0);
+  setUser({ name: cleanName });
+  
+  localStorage.setItem('q_active_session', cleanName);
+  localStorage.setItem('q_active_pass', passwordInput);
+
+  setAuthLoading(false); // End loading
+  setIsLoginView(false);
+  setShowWelcome(true);
+  setTimeout(() => setShowWelcome(false), 2500);
+};
+
+  const sync = async (payload: any) => {
+    const sessionName = localStorage.getItem('q_active_session');
+    if (!sessionName) return;
+  
+    // Map your local variable names to your Supabase Column Names
+    const updatePayload: any = {
+      last_active: new Date().toISOString()
+    };
+  
+    if (payload.count !== undefined) updatePayload.tasbeeh_count = payload.count;
+    if (payload.log !== undefined) updatePayload.fasting_days = payload.log;
+    if (payload.quran !== undefined) updatePayload.quran_progress = payload.quran;
+  
+    const { error } = await supabase
+      .from('user_vaults')
+      .update(updatePayload)
+      .eq('user_name', sessionName.toLowerCase());
+  
+    if (error) console.error("Sync Error:", error.message);
   };
 
   if (isLoginView) return (
-    <div className="min-h-screen bg-[#F5F5F0] flex items-center justify-center p-6 text-[#2D2D2A]">
-      <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="bg-white border-2 border-[#2D2D2A] p-12 w-full max-w-md shadow-[12px_12px_0px_#2D2D2A]">
-        <h2 className="text-2xl font-black italic uppercase mb-8">Vault_Gate</h2>
-        <form onSubmit={(e) => { e.preventDefault(); if(tempName) loadUserData(tempName); }}>
-          <input className="w-full bg-transparent border-b-2 border-[#2D2D2A] p-3 outline-none font-black text-3xl uppercase mb-8" placeholder="NAME" value={tempName} onChange={(e) => setTempName(e.target.value)} />
-          <button className="w-full bg-[#2D2D2A] text-white py-4 font-black uppercase text-xs">Connect</button>
+    <div className="min-h-screen bg-[#EBE7D9] flex items-center justify-center p-4 relative overflow-hidden font-sans">
+      <div className="absolute -top-24 -right-24 w-96 h-96 rounded-full bg-[#B4C2A8] opacity-20 blur-3xl" />
+      
+      <div className="max-w-md w-full relative">
+        <header className="mb-12">
+          {/* The "Barakah" Glow - only appears when authLoading is true */}
+  {authLoading && (
+    <motion.div 
+      layoutId="glow"
+      className="absolute -inset-8 bg-[#B4C2A8]/20 blur-3xl rounded-full"
+      animate={{ 
+        scale: [1, 1.1, 1],
+        opacity: [0.3, 0.6, 0.3] 
+      }}
+      transition={{ duration: 2, repeat: Infinity }}
+    />
+  )}
+
+  <div className="relative">
+    <motion.div
+      initial={{ opacity: 0, x: -20 }}
+      animate={{ opacity: 1, x: 0 }}
+      transition={{ duration: 0.8 }}
+    >
+      <h1 className="text-7xl font-serif italic text-[#2D3328] tracking-tighter leading-[0.8]">
+        Ramadan
+        <motion.span 
+          animate={{ rotate: [0, 10, 0] }}
+          transition={{ duration: 5, repeat: Infinity, ease: "easeInOut" }}
+          className="inline-block ml-2 text-[#B4C2A8]"
+        >
+          <Moon size={32} fill="currentColor" />
+        </motion.span>
+      </h1>
+    </motion.div>
+
+    <motion.div
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: 0.3, duration: 0.8 }}
+      className="flex items-center gap-3 mt-2"
+    >
+      <div className="h-[1px] w-8 bg-[#2D3328]/20" />
+      <span className="text-xl font-sans font-light text-[#2D3328]/60 uppercase tracking-[0.6em]">
+        Tracker
+      </span>
+      <div className="flex gap-1">
+        {[...Array(3)].map((_, i) => (
+          <motion.div 
+            key={i}
+            animate={{ opacity: [0.2, 1, 0.2] }}
+            transition={{ delay: i * 0.2, repeat: Infinity, duration: 1.5 }}
+            className="w-1 h-1 rounded-full bg-[#B4C2A8]"
+          />
+        ))}
+      </div>
+    </motion.div>
+  </div>
+    
+        
+
+          {/* UNIQUE ANIMATED TOGGLE */}
+<div className="relative mt-12 w-[220px] bg-[#2D3328]/5 p-1 rounded-full flex items-center cursor-pointer border border-[#2D3328]/5 overflow-hidden">
+  <motion.div 
+    className="absolute h-[calc(100%-8px)] bg-white rounded-full shadow-sm"
+    initial={false}
+    animate={{ 
+      x: isRegistering ? "102px" : "4px", // Precise pixel tracking
+      width: isRegistering ? "110px" : "100px" 
+    }}
+    transition={{ type: "spring", stiffness: 350, damping: 30 }}
+  />
+  <button 
+    type="button"
+    onClick={() => setIsRegistering(false)}
+    className={`relative z-10 w-[105px] py-2.5 text-[10px] font-black uppercase tracking-widest transition-colors duration-300 ${!isRegistering ? 'text-[#2D3328]' : 'text-[#2D3328]/30'}`}
+  >
+    Login
+  </button>
+  <button 
+    type="button"
+    onClick={() => setIsRegistering(true)}
+    className={`relative z-10 w-[115px] py-2.5 text-[10px] font-black uppercase tracking-widest transition-colors duration-300 ${isRegistering ? 'text-[#2D3328]' : 'text-[#2D3328]/30'}`}
+  >
+    Register
+  </button>
+</div>
+        </header>
+  
+        <form onSubmit={(e) => { e.preventDefault(); handleAuth(); }} className="space-y-12">
+          <div className="relative group">
+            <input 
+              className="w-full bg-transparent border-b border-[#2D3328]/20 py-4 outline-none text-2xl font-light text-[#2D3328] placeholder:opacity-20 transition-all focus:border-[#2D3328]" 
+              placeholder="Identity" 
+              value={tempName} 
+              onChange={(e) => setTempName(e.target.value)} 
+            />
+          </div>
+  
+          <div className="relative group">
+            <input 
+              type="password"
+              className="w-full bg-transparent border-b border-[#2D3328]/20 py-4 outline-none text-2xl font-light text-[#2D3328] placeholder:opacity-20 transition-all focus:border-[#2D3328]" 
+              placeholder="Pass-Key" 
+              value={tempPass} 
+              onChange={(e) => setTempPass(e.target.value)} 
+            />
+          </div>
+  
+          <button className="group flex items-center gap-6 pt-4">
+            <motion.div 
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              className="w-16 h-16 rounded-full border border-[#2D3328] flex items-center justify-center group-hover:bg-[#2D3328] group-hover:text-[#EBE7D9] transition-all duration-500"
+            >
+              <ArrowRight size={24} />
+            </motion.div>
+            <div className="text-left">
+              <span className="text-[10px] font-black uppercase tracking-[0.5em] text-[#2D3328]">
+                 {isRegistering ? "Establish Vault" : "Verify Access"}
+              </span>
+            </div>
+          </button>
         </form>
+      </div>
+      <AnimatePresence>
+  {showSuggestionPopup && (
+    <motion.div 
+      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+      className="fixed inset-0 z-[100] bg-[#2D3328]/20 backdrop-blur-sm flex items-center justify-center p-6"
+    >
+      <motion.div 
+        initial={{ scale: 0.9, y: 20 }} animate={{ scale: 1, y: 0 }}
+        className="bg-[#FCFBF7] p-8 rounded-[2.5rem] shadow-2xl max-w-sm w-full border border-[#2D3328]/10 text-center"
+      >
+        <div className="w-12 h-12 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-6">
+          <AlertCircle className="text-amber-600" size={24} />
+        </div>
+        
+        <h3 className="text-xl font-serif italic text-[#2D3328] mb-2">Identity Exists</h3>
+        <p className="text-[10px] text-[#2D3328] font-black uppercase tracking-widest opacity-50 mb-8 leading-relaxed">
+          This username is already taken. Would you like to use this unique identity instead?
+        </p>
+
+        <button 
+          onClick={() => {
+            if(suggestion) setTempName(suggestion);
+            setShowSuggestionPopup(false);
+          }}
+          className="w-full bg-[#2D3328] text-[#EBE7D9] py-4 rounded-2xl font-black uppercase text-[10px] tracking-[0.3em] mb-4 hover:bg-[#3d4536] transition-colors"
+        >
+          Use "{suggestion}"
+        </button>
+
+        <button 
+          onClick={() => setShowSuggestionPopup(false)}
+          className="text-[12px] text-[#2d3328] font-black uppercase tracking-widest opacity-30 hover:opacity-100 transition-opacity"
+        >
+          Cancel
+        </button>
+      </motion.div>
+    </motion.div>
+  )}
+</AnimatePresence>
+    </div>
+  );
+
+  if (authLoading) return (
+    <div className="min-h-screen bg-[#EBE7D9] flex items-center justify-center">
+      <motion.div 
+        animate={{ opacity: [0.4, 1, 0.4] }} 
+        transition={{ repeat: Infinity, duration: 1.5 }}
+        className="text-[10px] font-black uppercase tracking-[0.5em] text-[#2D3328]"
+      >
+        Unlocking Vault...
       </motion.div>
     </div>
   );
@@ -485,24 +792,26 @@ const iftarDate = new Date(nowInCity.getFullYear(), nowInCity.getMonth(), nowInC
 
           <button onClick={() => { 
             localStorage.removeItem('q_active_session'); 
+            localStorage.removeItem('q_active_pass');
             window.location.reload(); }} 
             className="p-3 bg-red-500/10 text-red-500 rounded-full hover:bg-red-500 hover:text-white transition-all"><LogOut size={18}/></button>
         </div>
       </header>
 
           {/* UPDATED CITY SEARCH & FEEDBACK */}
-      <div className="max-w-6xl mx-auto mb-6 flex flex-col gap-2 mt-16 md:mt-0">
-        <div className="flex flex-wrap items-center gap-4">
-          <div className="relative flex-1 max-w-xs">
-            <Search className={`absolute left-3 top-1/2 -translate-y-1/2 ${isSearching ? 'animate-pulse' : 'opacity-20'}`} size={14} />
-            <input 
-              className="w-full bg-current/[0.05] border-2 border-transparent focus:border-current/20 rounded-full py-2 pl-10 pr-4 text-xs font-bold outline-none" 
-              placeholder="Search City or Region..." 
-              value={cityInput} 
-              onChange={(e) => setCityInput(e.target.value)} 
-              onKeyDown={(e) => e.key === 'Enter' && fetchCityTimings(cityInput)} 
-            />
-          </div>
+          <div className="max-w-6xl mx-auto mb-6 flex flex-col gap-2 mt-16 md:mt-0">
+          <div className="flex flex-wrap items-center gap-4">
+            <div className="relative flex-1 max-w-xs">
+              <Search className={`absolute left-3 top-1/2 -translate-y-1/2 ${isSearching ? 'animate-pulse' : 'opacity-40'}`} size={14} />
+              <input 
+                className="w-full bg-[#2D3328]/10 border-2 border-[#2D3328]/5 focus:border-[#2D3328]/20 rounded-full py-2.5 pl-10 pr-4 text-xs font-bold outline-none transition-all placeholder:text-[#2D3328]/30" 
+                placeholder="Search City or Region..." 
+                value={cityInput} 
+                style={{ color: theme.text }} // Ensures text color is immediate
+                onChange={(e) => setCityInput(e.target.value)} 
+                onKeyDown={(e) => e.key === 'Enter' && fetchCityTimings(cityInput)} 
+              />
+            </div>
 
           {/* DETECTED LOCATION BADGE */}
           <AnimatePresence>
@@ -564,7 +873,7 @@ const iftarDate = new Date(nowInCity.getFullYear(), nowInCity.getMonth(), nowInC
         </div>
       </div>
 
-<div className="fixed bottom-4 left-4 z-[1000] flex gap-2">
+{/* <div className="fixed bottom-4 left-4 z-[1000] flex gap-2">
   <button 
     onClick={() => setShowIftarMubarak(true)} 
     className="bg-orange-500 text-white p-2 text-[8px] font-black uppercase rounded"
@@ -584,7 +893,7 @@ const iftarDate = new Date(nowInCity.getFullYear(), nowInCity.getMonth(), nowInC
 >
   Force Checkmark
 </button>
-</div>
+</div> */}
       <main className="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-12">
       <section className="lg:col-span-7">
         <div className="border-2 p-16 text-center rounded-[3rem] relative flex items-center justify-center min-h-[500px]" style={{ borderColor: theme.text }}>
@@ -657,6 +966,7 @@ const iftarDate = new Date(nowInCity.getFullYear(), nowInCity.getMonth(), nowInC
                 ))}
               </div>
            </div>
+           
             {/* COMPACT BARAKAH LOG */}
 <div className="mt-8 mb-12 p-6 bg-black/[0.03] rounded-[2rem] border border-black/5">
   <div className="flex items-center justify-between mb-4">
@@ -670,7 +980,7 @@ const iftarDate = new Date(nowInCity.getFullYear(), nowInCity.getMonth(), nowInC
   <div className="grid grid-cols-10 gap-1.5">
   {Object.keys(MINGORA_TIMINGS).map((dateKey, index) => {
   // FORCE CHECK for the first two days, otherwise check the actual log
-  const isBonusDay = ["2026-02-19", "2026-02-20", "2026-02-21"].includes(dateKey);
+  const isBonusDay = ["2026-02-19", "2026-02-20", "2026-02-21", "2026-02-22", "2026-02-23"].includes(dateKey);
   const isCompleted = isBonusDay || fastingLog.includes(dateKey);
   
   const isToday = new Date().toISOString().split('T')[0] === dateKey;
@@ -693,7 +1003,7 @@ const iftarDate = new Date(nowInCity.getFullYear(), nowInCity.getMonth(), nowInC
         </aside>
       </main>
 
-       
+    
 
       {/* ARCHIVE MODAL */}
       <AnimatePresence>

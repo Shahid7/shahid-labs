@@ -253,7 +253,11 @@ export default function HomeHub() {
   const [glitch, setGlitch] = useState(false);
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
   const clickCount = useRef(0);
+  const [isMounted, setIsMounted] = useState(false);
 
+useEffect(() => {
+  setIsMounted(true);
+}, []);
   const playSound = (url: string, volume = 0.2) => {
     try {
       const audio = new Audio(url);
