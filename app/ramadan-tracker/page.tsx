@@ -140,7 +140,7 @@ export default function QamarFinal() {
   const [showSuggestionPopup, setShowSuggestionPopup] = useState(false);
   const [tempPass, setTempPass] = useState(""); 
   const [celebrated, setCelebrated] = useState(false);
-  const INITIAL_FASTING_DAYS = ["2026-02-19", "2026-02-20", "2026-02-21", "2026-02-22", "2026-02-23", "2026-02-24"];
+  const INITIAL_FASTING_DAYS = ["2026-02-19", "2026-02-20", "2026-02-21", "2026-02-22", "2026-02-23", "2026-02-24", "2026-02-25"];
   const [activeTab, setActiveTab] = useState<'tracker' | 'sunnah'>('tracker');
   const supabase = createClient('https://rqcbplnanidhqiwpgzrn.supabase.co', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJxY2JwbG5hbmlkaHFpd3BnenJuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk3NDEzNzEsImV4cCI6MjA4NTMxNzM3MX0.aikDCClbrh7F5V68uyjUlCuZotedUkeYwdzv8fnvEbA');
   const logout = () => {
@@ -658,30 +658,30 @@ const sync = async (payload: any) => {
     updatePayload.tahajjud_intent = payload.tahajjud_intent;
 
     // This is the part that fills the History/Registry
-    // const { error: regError } = await supabase
-    //   .from('nightly_registry')
-    //   .insert([{
-    //     user_name: sessionName.toLowerCase(), // Ensure this matches user_vaults user_name
-    //     completed_items: payload.sunnah_completed,
-    //     intent: payload.tahajjud_intent,
-    //     date: new Date().toISOString().split('T')[0] // explicitly set the date
-    //   }]);
+    const { error: regError } = await supabase
+      .from('nightly_registry')
+      .insert([{
+        user_name: sessionName.toLowerCase(), // Ensure this matches user_vaults user_name
+        completed_items: payload.sunnah_completed,
+        intent: payload.tahajjud_intent,
+        date: new Date().toISOString().split('T')[0] // explicitly set the date
+      }]);
   }
 
-  const saveToRegistry = async () => {
-    const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD format
+  // const saveToRegistry = async () => {
+  //   const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD format
   
-    const { error } = await supabase
-      .from('nightly_registry')
-      .upsert({ 
-          user_name: user, 
-          date: today, 
-          intent: payload.tahajjud_intent,
-          completed_items: payload.sunnah_completed,
-        }, 
-        { onConflict: 'user_name,date' } // This prevents duplicates!
-      );
-  };
+  //   const { error } = await supabase
+  //     .from('nightly_registry')
+  //     .upsert({ 
+  //         user_name: user, 
+  //         date: today, 
+  //         intent: payload.tahajjud_intent,
+  //         completed_items: payload.sunnah_completed,
+  //       }, 
+  //       { onConflict: 'user_name,date' } // This prevents duplicates!
+  //     );
+  // };
 
   // 2. Push to Supabase
   const { error } = await supabase
