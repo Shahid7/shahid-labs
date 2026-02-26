@@ -80,31 +80,76 @@ export default function MasterAdmin() {
               {users.filter(u => u.user_name.toLowerCase().includes(searchTerm.toLowerCase())).map((u) => (
                 <div key={u.id} className="bg-white/[0.03] border border-white/5 rounded-[2.5rem] p-6 md:p-10 hover:bg-white/[0.05] transition-all relative overflow-hidden group">
                   
-                  {/* HISTORY BUTTON */}
-                  <button 
-                    onClick={() => fetchHistory(u.user_name)}
-                    className="absolute top-6 right-6 p-3 bg-white/5 rounded-full hover:bg-[#B4C2A8] hover:text-[#1A1D17] transition-all"
-                  >
-                    <History size={16} />
-                  </button>
+                  {/* HISTORY BUTTON (Existing) */}
+  <button 
+    onClick={() => fetchHistory(u.user_name)}
+    className="absolute top-6 right-6 p-3 bg-white/5 rounded-full hover:bg-[#B4C2A8] hover:text-[#1A1D17] transition-all"
+  >
+    <History size={16} />
+  </button>
 
-                  <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
-                    {/* Identity & Stats (Simplified for brevity, keep your existing identity/stats code here) */}
-                    <div className="space-y-2">
-                        <span className="text-[8px] font-black opacity-30 uppercase block">Vault Holder</span>
-                        <p className="text-2xl font-serif italic text-[#B4C2A8]">{u.user_name}</p>
-                        <p className="text-[10px] opacity-40 uppercase">Fasts: {u.fasting_days?.length || 0} | Tasbeeh: {u.tasbeeh_count}</p>
-                    </div>
+  <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
+    {/* 1. Identity & Credentials */}
+    <div className="space-y-4">
+        <div>
+          <span className="text-[8px] font-black opacity-30 uppercase block">Vault Holder</span>
+          <p className="text-2xl font-serif italic text-[#B4C2A8]">{u.user_name}</p>
+        </div>
+        
+        <div className="space-y-1">
+          <div className="flex items-center gap-2 text-white/40">
+            <MapPin size={10} />
+            <span className="text-[10px] uppercase font-bold tracking-tighter">{u.city || 'Unknown City'}</span>
+          </div>
+          <div className="flex items-center gap-2 text-amber-500/50">
+            <span className="text-[8px] font-black uppercase">Key:</span>
+            <span className="text-[10px] font-mono">{u.password || '••••••'}</span>
+          </div>
+        </div>
+    </div>
 
-                    {/* Latest Intent */}
-                    <div className="col-span-1 md:col-span-3 border-l border-white/5 pl-6">
-                        <span className="text-[8px] font-black opacity-30 uppercase block mb-2 tracking-widest text-amber-500/60">Current Intent</span>
-                        <p className="text-xs italic opacity-80 leading-relaxed">
-                            {u.tahajjud_intent ? `"${u.tahajjud_intent}"` : "No intent active."}
-                        </p>
-                    </div>
-                  </div>
-                </div>
+    {/* 2. Quran Progress Tracker */}
+    <div className="border-l border-white/5 pl-6">
+        <span className="text-[8px] font-black opacity-30 uppercase block mb-3 tracking-widest text-emerald-500/60">Quran Registry</span>
+        <div className="space-y-2">
+            <p className="text-xs font-bold text-white/80">
+              {u.quran_last_surah ? `Last Read: ${u.quran_last_surah}` : 'No Reading Started'}
+            </p>
+            {/* If you store progress as a percentage or ayah count */}
+            <div className="w-full bg-white/5 h-1 rounded-full overflow-hidden">
+                <div 
+                  className="bg-emerald-500 h-full transition-all" 
+                  style={{ width: `${u.quran_completion || 0}%` }} 
+                />
+            </div>
+            <p className="text-[8px] opacity-40 uppercase">Progress: {u.quran_completion || 0}% Complete</p>
+        </div>
+    </div>
+
+    {/* 3. Ritual Stats */}
+    <div className="border-l border-white/5 pl-6">
+        <span className="text-[8px] font-black opacity-30 uppercase block mb-3 tracking-widest">Ritual Activity</span>
+        <div className="grid grid-cols-2 gap-4">
+            <div>
+              <p className="text-lg font-serif italic text-white/80">{u.fasting_days?.length || 0}</p>
+              <p className="text-[8px] opacity-30 uppercase">Fasts</p>
+            </div>
+            <div>
+              <p className="text-lg font-serif italic text-white/80">{u.tasbeeh_count || 0}</p>
+              <p className="text-[8px] opacity-30 uppercase">Tasbeeh</p>
+            </div>
+        </div>
+    </div>
+
+    {/* 4. Latest Intent */}
+    <div className="border-l border-white/5 pl-6">
+        <span className="text-[8px] font-black opacity-30 uppercase block mb-2 tracking-widest text-amber-500/60">Current Intent</span>
+        <p className="text-xs italic opacity-80 leading-relaxed max-h-20 overflow-y-auto">
+            {u.tahajjud_intent ? `"${u.tahajjud_intent}"` : "No intent active."}
+        </p>
+    </div>
+  </div>
+</div>
               ))}
             </div>
           </div>
