@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from 'react';
-import {Search, MapPin} from 'lucide-react'
+import { Search, MapPin, Moon, CheckCircle2, Quote, History, X, Calendar } from 'lucide-react'
 import { createClient } from '@supabase/supabase-js';
 
 const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
@@ -9,26 +9,43 @@ export default function MasterAdmin() {
     const [access, setAccess] = useState(false);
     const [keyInput, setKeyInput] = useState("");
     const [users, setUsers] = useState<any[]>([]);
-    const MASTER_KEY = "123"; // Change this!
     const [searchTerm, setSearchTerm] = useState("");
+    
+    // History Modal States
+    const [selectedUser, setSelectedUser] = useState<string | null>(null);
+    const [history, setHistory] = useState<any[]>([]);
+    const [loadingHistory, setLoadingHistory] = useState(false);
+
+    const MASTER_KEY = "123";
+
     const checkAccess = () => {
       if (keyInput === MASTER_KEY) setAccess(true);
     };
 
-    const filteredUsers = users.filter(u => 
-        u.user_name.toLowerCase().includes(searchTerm.toLowerCase())
-      );
-  
+    const fetchHistory = async (userName: string) => {
+      setLoadingHistory(true);
+      setSelectedUser(userName);
+      const { data } = await supabase
+        .from('nightly_registry')
+        .select('*')
+        .eq('user_name', userName)
+        .order('date', { ascending: false });
+        // Deduplicate by date on the frontend (Safety Net)
+  const uniqueHistory = data ? Array.from(new Map(data.map(item => [item.date, item])).values()) : [];
+      setHistory(uniqueHistory || []);
+      setLoadingHistory(false);
+    };
+
     useEffect(() => {
       if (access) {
         const fetchAll = async () => {
-          const { data } = await supabase.from('user_vaults').select('*');
+          const { data } = await supabase.from('user_vaults').select('*').order('last_active', { ascending: false });
           setUsers(data || []);
         };
         fetchAll();
       }
     }, [access]);
-  
+
     if (!access) return (
       <div className="min-h-screen bg-[#2D3328] flex items-center justify-center p-6">
         <input 
@@ -42,86 +59,107 @@ export default function MasterAdmin() {
     );
 
     return (
-        <div className="min-h-screen bg-[#1A1D17] text-[#EBE7D9] p-4 md:p-20 font-sans">
+        <div className="min-h-screen bg-[#1A1D17] text-[#EBE7D9] p-4 md:p-20 font-sans relative">
           <div className="max-w-6xl mx-auto">
             <header className="flex flex-col md:flex-row justify-between items-start md:items-end mb-12 gap-6">
               <div>
                 <h1 className="text-5xl md:text-8xl font-serif italic tracking-tighter">The Registry</h1>
-                <div className="flex items-center gap-4 mt-4">
-                  <span className="text-[10px] font-black uppercase tracking-[0.5em] text-[#B4C2A8]">Live Database</span>
-                  <div className="h-[1px] w-12 bg-white/20" />
-                  <span className="text-[10px] font-mono opacity-40">{users.length} Records</span>
-                </div>
+                <p className="text-[10px] font-black uppercase tracking-[0.5em] text-[#B4C2A8] mt-4">Master Executive Control</p>
               </div>
-              
-              {/* SEARCH BAR */}
               <div className="w-full md:w-72 relative">
                 <Search className="absolute left-4 top-1/2 -translate-y-1/2 opacity-30" size={16} />
                 <input 
-                  className="w-full bg-white/5 border border-white/10 rounded-2xl py-4 pl-12 pr-4 text-xs outline-none focus:border-[#B4C2A8]/50 transition-all"
+                  className="w-full bg-white/5 border border-white/10 rounded-2xl py-4 pl-12 pr-4 text-xs outline-none focus:border-[#B4C2A8]/50"
                   placeholder="Search Holder..."
-                  value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                 />
               </div>
             </header>
     
-            {/* TABLE LOGIC */}
-            <div className="space-y-4">
-              {filteredUsers.map((u) => (
-                <div key={u.id} className="bg-white/[0.03] border border-white/5 rounded-3xl p-6 md:p-8 hover:bg-white/[0.06] transition-all group">
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-6 items-center">
-                    
-                    {/* IDENTITY */}
-                    <div className="col-span-2 md:col-span-1">
-                      <span className="text-[8px] font-black opacity-30 uppercase block mb-1">Vault Holder</span>
-                      <p className="text-xl font-medium group-hover:text-[#B4C2A8] transition-colors truncate">{u.user_name}</p>
-                    </div>
-    
-                    {/* PASSWORD */}
-                    <div className="border-l border-white/10 pl-4">
-                      <span className="text-[8px] font-black opacity-30 uppercase block mb-1">Access Key</span>
-                      <p className="font-mono text-sm opacity-60">“{u.password}”</p>
-                    </div>
-    
-                    {/* STATS */}
-                    <div className="flex gap-6 border-l border-white/10 pl-4">
-                      <div>
-                        <span className="text-[8px] font-black opacity-30 uppercase block mb-1">Tasbeeh</span>
-                        <p className="text-lg italic font-serif">{u.tasbeeh_count}</p>
-                      </div>
-                      <div>
-                        <span className="text-[8px] font-black opacity-30 uppercase block mb-1">Fasts</span>
-                        <p className="text-lg italic font-serif">{u.fasting_days?.length || 0}</p>
-                      </div>
-                    </div>
-    
-                    {/* TIMESTAMP & LOCATION */}
-                    <div className="col-span-2 md:col-span-1 text-left md:text-right border-t md:border-t-0 md:border-l border-white/10 pt-4 md:pt-0 md:pl-4">
-                      <span className="text-[8px] font-black opacity-30 uppercase block mb-1">Access Origin</span>
-                      <p className="text-[11px] font-bold text-[#B4C2A8] flex items-center md:justify-end gap-1">
-                        <MapPin size={10} /> {u.last_location || "Unknown"}
-                      </p>
-                      <p className="text-[10px] opacity-40 uppercase mt-1">
-                        {new Date(u.last_active).toLocaleDateString()} @ {new Date(u.last_active).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
-                      </p>
+            <div className="space-y-6">
+              {users.filter(u => u.user_name.toLowerCase().includes(searchTerm.toLowerCase())).map((u) => (
+                <div key={u.id} className="bg-white/[0.03] border border-white/5 rounded-[2.5rem] p-6 md:p-10 hover:bg-white/[0.05] transition-all relative overflow-hidden group">
+                  
+                  {/* HISTORY BUTTON */}
+                  <button 
+                    onClick={() => fetchHistory(u.user_name)}
+                    className="absolute top-6 right-6 p-3 bg-white/5 rounded-full hover:bg-[#B4C2A8] hover:text-[#1A1D17] transition-all"
+                  >
+                    <History size={16} />
+                  </button>
+
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
+                    {/* Identity & Stats (Simplified for brevity, keep your existing identity/stats code here) */}
+                    <div className="space-y-2">
+                        <span className="text-[8px] font-black opacity-30 uppercase block">Vault Holder</span>
+                        <p className="text-2xl font-serif italic text-[#B4C2A8]">{u.user_name}</p>
+                        <p className="text-[10px] opacity-40 uppercase">Fasts: {u.fasting_days?.length || 0} | Tasbeeh: {u.tasbeeh_count}</p>
                     </div>
 
-                    {/* TIMESTAMP (RESPONSIVE ALIGNMENT) */}
-                    <div className="col-span-2 md:col-span-1 text-left md:text-right border-t md:border-t-0 md:border-l border-white/10 pt-4 md:pt-0 md:pl-4">
-                      <span className="text-[8px] font-black opacity-30 uppercase block mb-1">Last Active</span>
-                      <p className="text-[11px] font-bold text-[#B4C2A8]">
-                        {new Date(u.last_active).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })}
-                      </p>
-                      <p className="text-[10px] opacity-40 uppercase">
-                         {new Date(u.last_active).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                      </p>
+                    {/* Latest Intent */}
+                    <div className="col-span-1 md:col-span-3 border-l border-white/5 pl-6">
+                        <span className="text-[8px] font-black opacity-30 uppercase block mb-2 tracking-widest text-amber-500/60">Current Intent</span>
+                        <p className="text-xs italic opacity-80 leading-relaxed">
+                            {u.tahajjud_intent ? `"${u.tahajjud_intent}"` : "No intent active."}
+                        </p>
                     </div>
                   </div>
                 </div>
               ))}
             </div>
           </div>
+
+          {/* HISTORY MODAL OVERLAY */}
+          {selectedUser && (
+            <div className="fixed inset-0 z-[1000] bg-black/90 backdrop-blur-xl flex items-center justify-end">
+                <div className="w-full max-w-2xl h-full bg-[#1A1D17] border-l border-white/10 p-8 md:p-16 overflow-y-auto">
+                    <div className="flex justify-between items-center mb-12">
+                        <div>
+                            <h2 className="text-4xl font-serif italic">{selectedUser}'s Timeline</h2>
+                            <p className="text-[10px] font-black uppercase tracking-[0.3em] opacity-40 mt-2">Historical Nightly Records</p>
+                        </div>
+                        <button onClick={() => setSelectedUser(null)} className="p-4 bg-white/5 rounded-full hover:bg-red-500/20"><X size={20}/></button>
+                    </div>
+
+                    {loadingHistory ? (
+                        <div className="flex items-center justify-center h-64 opacity-20 animate-pulse text-xs uppercase font-black tracking-widest">Accessing Registry...</div>
+                    ) : (
+                        <div className="space-y-12 relative">
+                            {/* Vertical Timeline Line */}
+                            <div className="absolute left-[11px] top-0 bottom-0 w-[1px] bg-white/10" />
+
+                            {history.length > 0 ? history.map((entry, i) => (
+                                <div key={i} className="relative pl-10">
+                                    <div className="absolute left-0 top-1 w-6 h-6 bg-[#1A1D17] border-2 border-[#B4C2A8] rounded-full flex items-center justify-center">
+                                        <div className="w-2 h-2 bg-[#B4C2A8] rounded-full" />
+                                    </div>
+                                    
+                                    <div className="flex items-center gap-3 mb-3">
+                                        <Calendar size={12} className="opacity-30" />
+                                        <span className="text-[10px] font-black uppercase tracking-widest opacity-40">
+                                            {new Date(entry.date).toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' })}
+                                        </span>
+                                    </div>
+
+                                    <div className="bg-white/[0.02] border border-white/5 p-6 rounded-3xl">
+                                        <p className="text-sm italic text-white/80 mb-4 leading-relaxed">"{entry.intent}"</p>
+                                        <div className="flex flex-wrap gap-2">
+                                            {entry.completed_items?.map((item: string) => (
+                                                <span key={item} className="text-[7px] font-black px-2 py-1 bg-green-500/10 text-green-500 rounded border border-green-500/20 uppercase">
+                                                    {item}
+                                                </span>
+                                            ))}
+                                        </div>
+                                    </div>
+                                </div>
+                            )) : (
+                                <p className="text-center opacity-30 py-20 italic">No sealed nights found in history.</p>
+                            )}
+                        </div>
+                    )}
+                </div>
+            </div>
+          )}
         </div>
       );
-    }
+}

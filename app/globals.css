@@ -1,8 +1,16 @@
+@import url('https://fonts.googleapis.com/css2?family=Amiri:ital,wght@0,400;0,700;1,400;1,700&family=Noto+Nastaliq+Urdu:wght@400..700&display=swap');
 @import "tailwindcss";
+
+
 
 :root {
   --background: #ffffff;
   --foreground: #171717;
+}
+
+.urdu-font {
+  font-family: "Noto Nastaliq Urdu", serif;
+  line-height: 2.5; /* Urdu needs more vertical space */
 }
 
 @theme inline {
