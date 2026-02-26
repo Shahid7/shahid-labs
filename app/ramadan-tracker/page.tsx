@@ -151,6 +151,22 @@ export default function QamarFinal() {
     setIsLoginView(true);
   };
 
+  const [isNightTime, setIsNightTime] = useState(false);
+
+useEffect(() => {
+  const checkTime = () => {
+    const currentHour = new Date().getHours();
+    // 18 is 6:00 PM. This will be true from 6:00 PM to 11:59 PM.
+    // If you want it to show until Fajr (e.g., 5 AM), use: (currentHour >= 18 || currentHour < 5)
+    setIsNightTime(currentHour >= 18);
+  };
+
+  checkTime();
+  // Optional: Check every minute in case the user leaves the page open
+  const interval = setInterval(checkTime, 60000); 
+  return () => clearInterval(interval);
+}, []);
+
   const handleAuth = async () => {
     if (!tempName || !tempPass) return alert("Fill all fields");
     const cleanName = tempName.toLowerCase().trim();
@@ -1021,6 +1037,7 @@ const sync = async (payload: any) => {
                 </div>
   
                 {/* BEAUTIFUL NIGHTLY SUNNAH CALL-TO-ACTION */}
+                {isNightTime && (
                 <motion.div 
                   whileHover={{ y: -5, scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
@@ -1045,7 +1062,7 @@ const sync = async (payload: any) => {
                     </div>
                   </div>
                 </motion.div>
-                
+                )}
                 <div className="mt-8 mb-12 p-6 bg-black/[0.03] rounded-[2rem] border border-black/5">
                   <div className="flex items-center justify-between mb-4">
                     <div className="flex items-center gap-2">
