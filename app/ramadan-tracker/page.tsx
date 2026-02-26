@@ -6,6 +6,7 @@ import {
   ArrowRight, AlertCircle, Check, LogOut, X, Sunrise, Sunset, 
   Moon, Volume2, VolumeX, BookOpen, Quote, Search, Info, AlertTriangle, ScrollText, CheckCircle2
 } from 'lucide-react';
+import AlKhatm from '../diary/page';
 import { createClient } from '@supabase/supabase-js';
 
 
@@ -139,6 +140,8 @@ export default function QamarFinal() {
   const [showSuggestionPopup, setShowSuggestionPopup] = useState(false);
   const [tempPass, setTempPass] = useState(""); 
   const [celebrated, setCelebrated] = useState(false);
+  const INITIAL_FASTING_DAYS = ["2026-02-19", "2026-02-20", "2026-02-21", "2026-02-22", "2026-02-23", "2026-02-24"];
+  const [activeTab, setActiveTab] = useState<'tracker' | 'sunnah'>('tracker');
   const supabase = createClient('https://rqcbplnanidhqiwpgzrn.supabase.co', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJxY2JwbG5hbmlkaHFpd3BnenJuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk3NDEzNzEsImV4cCI6MjA4NTMxNzM3MX0.aikDCClbrh7F5V68uyjUlCuZotedUkeYwdzv8fnvEbA');
   const logout = () => {
     localStorage.removeItem('q_active_session');
@@ -207,7 +210,7 @@ export default function QamarFinal() {
         user_name: cleanName,
         password: tempPass,
         tasbeeh_count: 0,
-        fasting_days: ["2026-02-19", "2026-02-20", "2026-02-21"],
+        fasting_days: INITIAL_FASTING_DAYS,
         last_active: new Date().toISOString(),
         last_location: userCity
       }]);
@@ -275,6 +278,38 @@ export default function QamarFinal() {
     };
     startHeartbeat();
   }, [controls]);
+
+  useEffect(() => {
+    const checkIftarAutoMark = () => {
+      const today = new Date().toISOString().split('T')[0];
+      
+      // 1. Only proceed if today isn't already marked
+      if (!fastingLog.includes(today)) {
+        
+        // 2. Parse current time and Iftar time
+        const [iftarH, iftarM] = cd.iftar.split(':').map(Number);
+        const now = new Date();
+        const nowH = now.getHours();
+        const nowM = now.getMinutes();
+  
+        // 3. Logic: If current time is past Iftar time
+        if (nowH > iftarH || (nowH === iftarH && nowM >= iftarM)) {
+          const newLog = [...fastingLog, today];
+          setFastingLog(newLog);
+          sync({ log: newLog }); // Save to Supabase
+          
+          // Show the celebration!
+          if (typeof setShowIftarMubarak === 'function') {
+             setShowIftarMubarak(true);
+          }
+        }
+      }
+    };
+  
+    // Check every minute
+    const timer = setInterval(checkIftarAutoMark, 60000); 
+    return () => clearInterval(timer);
+  }, [cd.iftar, fastingLog]);
 
   // 2. DHIKR HANDLER: Color Shift + Burst + Growth
   const handleDhikr = async () => {
@@ -419,7 +454,7 @@ export default function QamarFinal() {
       label = "UNTIL NEXT SEHAR";
     }
 
-    if (diff <= 1000 && diff > 0 && label === "UNTIL IFTAR") {
+    if (diff <= 2000 && diff > -2000 && label === "UNTIL IFTAR") {
       const today = new Date().toISOString().split('T')[0];
       
       if (!fastingLog.includes(today)) {
@@ -559,6 +594,16 @@ const loadUserData = async (name: string, passwordInput: string) => {
     }
   }
 
+// Check if the pre-marked days are missing and add them
+const missingDays = INITIAL_FASTING_DAYS.filter(day => !updatedLog.includes(day));
+if (missingDays.length > 0) {
+    updatedLog = [...updatedLog, ...missingDays];
+    // Sync this back to DB so the user "gets" the 6 days permanently
+    sync({ log: updatedLog }); 
+}
+
+
+
   // 5. FINALIZE UI
   setCount(vault.tasbeeh_count);
   setFastingLog(updatedLog);
@@ -574,26 +619,66 @@ const loadUserData = async (name: string, passwordInput: string) => {
   setTimeout(() => setShowWelcome(false), 2500);
 };
 
-  const sync = async (payload: any) => {
-    const sessionName = localStorage.getItem('q_active_session');
-    if (!sessionName) return;
+const sync = async (payload: any) => {
+  const sessionName = localStorage.getItem('q_active_session');
+  if (!sessionName) return;
+
+  // 1. Prepare the data for the 'user_vaults' table
+  const updatePayload: any = {
+    last_active: new Date().toISOString()
+  };
+
+  if (payload.count !== undefined) updatePayload.tasbeeh_count = payload.count;
+  if (payload.log !== undefined) updatePayload.fasting_days = payload.log;
+  if (payload.quran !== undefined) updatePayload.quran_progress = payload.quran;
   
-    // Map your local variable names to your Supabase Column Names
-    const updatePayload: any = {
-      last_active: new Date().toISOString()
-    };
-  
-    if (payload.count !== undefined) updatePayload.tasbeeh_count = payload.count;
-    if (payload.log !== undefined) updatePayload.fasting_days = payload.log;
-    if (payload.quran !== undefined) updatePayload.quran_progress = payload.quran;
+  // ADDED: Handle the Rituals (Tahajjud, Sadaqah, etc.)
+  if (payload.checks !== undefined) updatePayload.ritual_checks = payload.checks;
+
+  // ADDED: Handle the Sunnatul Layl (Nightly Diary) 
+  // We store the most recent night's data in the vault
+  if (payload.sunnah_completed !== undefined) {
+    updatePayload.last_nightly_sunnah = payload.sunnah_completed;
+    updatePayload.tahajjud_intent = payload.tahajjud_intent;
+
+    // This is the part that fills the History/Registry
+    // const { error: regError } = await supabase
+    //   .from('nightly_registry')
+    //   .insert([{
+    //     user_name: sessionName.toLowerCase(), // Ensure this matches user_vaults user_name
+    //     completed_items: payload.sunnah_completed,
+    //     intent: payload.tahajjud_intent,
+    //     date: new Date().toISOString().split('T')[0] // explicitly set the date
+    //   }]);
+  }
+
+  const saveToRegistry = async () => {
+    const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD format
   
     const { error } = await supabase
-      .from('user_vaults')
-      .update(updatePayload)
-      .eq('user_name', sessionName.toLowerCase());
-  
-    if (error) console.error("Sync Error:", error.message);
+      .from('nightly_registry')
+      .upsert({ 
+          user_name: user, 
+          date: today, 
+          intent: payload.tahajjud_intent,
+          completed_items: payload.sunnah_completed,
+        }, 
+        { onConflict: 'user_name,date' } // This prevents duplicates!
+      );
   };
+
+  // 2. Push to Supabase
+  const { error } = await supabase
+    .from('user_vaults')
+    .update(updatePayload)
+    .eq('user_name', sessionName.toLowerCase());
+
+  if (error) {
+    console.error("Sync Error:", error.message);
+  } else {
+    console.log("Vault Synchronized Successfully");
+  }
+};
 
   if (isLoginView) return (
     <div className="min-h-screen bg-[#EBE7D9] flex items-center justify-center p-4 relative overflow-hidden font-sans">
@@ -776,213 +861,203 @@ const loadUserData = async (name: string, passwordInput: string) => {
   );
 
   return (
-    <div className="min-h-screen transition-colors duration-1000 font-sans p-4 md:p-12 pb-24 relative overflow-hidden" style={{ backgroundColor: theme.bg, color: theme.text }}>
-
-<header className="max-w-6xl mx-auto flex justify-between items-center mb-16 border-b border-current/10 pb-8">
-        <div><h1 className="text-3xl font-black italic uppercase leading-none">{user?.name}</h1><p className="text-[9px] font-black opacity-20 uppercase tracking-[0.3em] mt-2">The Basirah Companion</p></div>
-        <div className="flex items-center gap-4">
-          <button onClick={() => setSoundEnabled(!soundEnabled)} className="p-3 opacity-40 hover:opacity-100">{soundEnabled ? <Volume2 size={18}/> : <VolumeX size={18}/>}</button>
-          
-          <button 
-            onClick={() => setArchiveOpen(true)} 
-            className="group px-6 py-2 font-black text-[10px] uppercase border-2 border-current hover:bg-current transition-all overflow-hidden relative"
+    <div className="min-h-screen transition-colors duration-1000 font-sans relative overflow-hidden" style={{ backgroundColor: theme.bg, color: theme.text }}>
+      <AnimatePresence mode="wait">
+        {activeTab === 'tracker' ? (
+          /* DAY TRACKER VIEW */
+          <motion.div 
+            key="tracker" 
+            initial={{ opacity: 0, y: 10 }} 
+            animate={{ opacity: 1, y: 0 }} 
+            exit={{ opacity: 0, y: -10 }}
+            className="p-4 md:p-12 pb-24"
           >
-            <span className="relative z-10 transition-colors duration-200 group-hover:text-[var(--bg)]" style={{ '--bg': theme.bg } as any}>Archives</span>
-          </button>
-
-          <button onClick={() => { 
-            localStorage.removeItem('q_active_session'); 
-            localStorage.removeItem('q_active_pass');
-            window.location.reload(); }} 
-            className="p-3 bg-red-500/10 text-red-500 rounded-full hover:bg-red-500 hover:text-white transition-all"><LogOut size={18}/></button>
-        </div>
-      </header>
-
-          {/* UPDATED CITY SEARCH & FEEDBACK */}
-          <div className="max-w-6xl mx-auto mb-6 flex flex-col gap-2 mt-16 md:mt-0">
-          <div className="flex flex-wrap items-center gap-4">
-            <div className="relative flex-1 max-w-xs">
-              <Search className={`absolute left-3 top-1/2 -translate-y-1/2 ${isSearching ? 'animate-pulse' : 'opacity-40'}`} size={14} />
-              <input 
-                className="w-full bg-[#2D3328]/10 border-2 border-[#2D3328]/5 focus:border-[#2D3328]/20 rounded-full py-2.5 pl-10 pr-4 text-xs font-bold outline-none transition-all placeholder:text-[#2D3328]/30" 
-                placeholder="Search City or Region..." 
-                value={cityInput} 
-                style={{ color: theme.text }} // Ensures text color is immediate
-                onChange={(e) => setCityInput(e.target.value)} 
-                onKeyDown={(e) => e.key === 'Enter' && fetchCityTimings(cityInput)} 
-              />
-            </div>
-
-          {/* DETECTED LOCATION BADGE */}
-          <AnimatePresence>
-            {detectedRegion && (
-              <motion.div 
-                initial={{ opacity: 0, x: -10 }} 
-                animate={{ opacity: 1, x: 0 }}
-                className="flex items-center gap-2 bg-green-500/10 text-green-500 px-4 py-2 rounded-full border border-green-500/20 text-[10px] font-black uppercase"
-              >
-                <CheckCircle2 size={12} />
-                Mapped to: {detectedRegion}
-              </motion.div>
-            )}
-          </AnimatePresence>
-
-          {errorMsg && (
-            <div className="text-red-500 text-[10px] font-black uppercase flex items-center gap-2 bg-red-500/10 px-4 py-2 rounded-full border border-red-500/20">
-              <AlertTriangle size={12}/> {errorMsg}
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* HUD */}
-      <div className="max-w-6xl mx-auto mb-12 grid grid-cols-1 lg:grid-cols-4 gap-6">
-        <div className="lg:col-span-3 border-2 p-8 md:p-12 rounded-[2.5rem] flex flex-col md:flex-row items-center justify-between gap-8" style={{ borderColor: theme.text + "15" }}>
-        <div>
-    <div className="flex items-center gap-3 mb-2">
-      <span className="text-[10px] font-black tracking-[0.4em] opacity-30 italic uppercase">
-        {cd.label} @ {city.toUpperCase()}
-      </span>
-      {/* THE LOCAL CLOCK BADGE */}
-      <span className="px-3 py-1 bg-current/5 rounded-full text-[9px] font-bold opacity-60">
-        Local: {localTime}
-      </span>
-    </div>
-    
-    <div className="flex items-baseline gap-1">
-      <span className="text-7xl md:text-9xl font-black italic tracking-tighter tabular-nums">{cd.h}</span>
-      <span className="text-3xl opacity-20 font-light">:</span>
-      <span className="text-7xl md:text-9xl font-black italic tracking-tighter tabular-nums">{cd.m}</span>
-    </div>
-  </div>
-          <div className="flex flex-col gap-6 text-right w-full md:w-auto">
-             <div className="flex items-center justify-between md:justify-end gap-6 border-b border-current/10 pb-2">
-                <Sunrise size={18} className="opacity-30" />
-                <div className="text-right leading-none"><span className="text-[8px] font-black opacity-30 block mb-1">SUHOOR</span><span className="text-2xl font-black italic">{cd.sehar}</span></div>
-             </div>
-             <div className="flex items-center justify-between md:justify-end gap-6">
-                <Sunset size={18} className="opacity-30" />
-                <div className="text-right leading-none"><span className="text-[8px] font-black opacity-30 block mb-1">IFTAR</span><span className="text-2xl font-black italic">{cd.iftar}</span></div>
-             </div>
-          </div>
-        </div>
-        <div className="border-2 p-8 rounded-[2.5rem] flex flex-col justify-center items-center text-center bg-current/[0.02]" style={{ borderColor: theme.text + "15" }}>
-           <Moon size={28} className="opacity-40 mb-4" />
-           <span className="text-[9px] font-black opacity-30 uppercase tracking-widest mb-1">Ramadan_Day</span>
-           <span className="text-4xl font-black italic">{ramadanDay.toString().padStart(2, '0')}<span className="text-lg opacity-20">/30</span></span>
-        </div>
-      </div>
-
-{/* <div className="fixed bottom-4 left-4 z-[1000] flex gap-2">
-  <button 
-    onClick={() => setShowIftarMubarak(true)} 
-    className="bg-orange-500 text-white p-2 text-[8px] font-black uppercase rounded"
-  >
-    Test Iftar
-  </button>
-  <button 
-    onClick={() => setShowSeharMubarak(true)} 
-    className="bg-blue-500 text-white p-2 text-[8px] font-black uppercase rounded"
-  >
-    Test Sehar
-  </button>
-
-  <button 
-  onClick={() => setFastingLog([...fastingLog, new Date().toISOString().split('T')[0]])}
-  className="bg-green-600 text-white p-2 text-[8px] font-black uppercase rounded"
->
-  Force Checkmark
-</button>
-</div> */}
-      <main className="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-12">
-      <section className="lg:col-span-7">
-        <div className="border-2 p-16 text-center rounded-[3rem] relative flex items-center justify-center min-h-[500px]" style={{ borderColor: theme.text }}>
-           
-          {/* THE NUR ORB CONTAINER */}
-          <div className="relative cursor-pointer" onClick={handleDhikr}>
-            
-            {/* PARTICLE EXPLOSION LAYER */}
-            <AnimatePresence>
-              {particles.map((p) => (
-                <motion.div
-                  key={p.id}
-                  initial={{ x: 0, y: 0, opacity: 1, scale: 1 }}
-                  animate={{ x: p.x, y: p.y, opacity: 0, scale: 0 }}
-                  exit={{ opacity: 0 }}
-                  className="absolute left-1/2 top-1/2 w-2 h-2 rounded-full z-10"
-                  style={{ backgroundColor: getOrbColor() }}
-                />
-              ))}
-            </AnimatePresence>
-
-            {/* MAIN ORB */}
-            <motion.div 
-              animate={controls}
-              className="w-64 h-64 rounded-full relative flex flex-col items-center justify-center"
-              style={{ 
-                background: `radial-gradient(circle, ${getOrbColor()} 0%, transparent 70%)`,
-                boxShadow: `0 0 ${20 + (count % 33) * 2}px ${getOrbColor()}`,
-                border: `1px solid ${theme.text}20`
-              }}
-            >
-              <motion.span 
-                key={count}
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="text-6xl font-black italic z-20"
-              >
-                {count}
-              </motion.span>
-              
-              <p className="text-[8px] font-black uppercase tracking-[0.4em] opacity-40 mt-4">Tasbeeh</p>
-
-              {/* ROTATING PROGRESS RING */}
-              <svg className="absolute inset-0 w-full h-full -rotate-90">
-                <motion.circle 
-                  cx="128" cy="128" r="120" 
-                  fill="none" 
-                  stroke="currentColor" 
-                  strokeWidth="2" 
-                  strokeDasharray="753" 
-                  animate={{ strokeDashoffset: 753 - (753 * (count % 33)) / 33 }}
-                  className="opacity-20"
-                />
-              </svg>
-            </motion.div>
-          </div>
-        </div>
-      </section>
-        <aside className="lg:col-span-5">
-           <div className="border-2 p-10 rounded-[2.5rem] bg-current/[0.02]" style={{ borderColor: theme.text + "15" }}>
-              <h3 className="text-xs font-black uppercase mb-8 opacity-40 italic tracking-widest">Rituals</h3>
-              <div className="space-y-6">
-                {["Tahajjud", "Surah Mulk", "Morning Adhkar", "Sadaqah"].map(item => (
-                  <div key={item} onClick={() => { const u = checkedItems.includes(item) ? checkedItems.filter(i => i !== item) : [...checkedItems, item]; setCheckedItems(u); sync({checks: u}); }} className="flex items-center gap-6 cursor-pointer group">
-                    <div className={`w-6 h-6 border-2 flex items-center justify-center transition-all ${checkedItems.includes(item) ? 'bg-current shadow-lg shadow-current/20' : ''}`} style={{ borderColor: theme.text }}>
-                      {checkedItems.includes(item) && <Check size={14} className="invert" />}
-                    </div>
-                    <span className={`text-xs font-black uppercase ${checkedItems.includes(item) ? 'opacity-20 line-through' : ''}`}>{item}</span>
-                  </div>
-                ))}
+            <header className="max-w-6xl mx-auto flex justify-between items-center mb-16 border-b border-current/10 pb-8">
+              <div>
+                <h1 className="text-3xl font-black italic uppercase leading-none">{user?.name}</h1>
+                <p className="text-[9px] font-black opacity-20 uppercase tracking-[0.3em] mt-2">The Basirah Companion</p>
               </div>
-           </div>
-           
-            {/* COMPACT BARAKAH LOG */}
-<div className="mt-8 mb-12 p-6 bg-black/[0.03] rounded-[2rem] border border-black/5">
-  <div className="flex items-center justify-between mb-4">
-    <div className="flex items-center gap-2">
-      <div className="w-2 h-2 rounded-full bg-[#FFBF00] animate-pulse" />
-      <h4 className="text-[9px] font-black uppercase tracking-widest opacity-40">Roza Tracker</h4>
-    </div>
-    <span className="text-[10px] font-black opacity-30">{fastingLog.length}/30 DAYS</span>
-  </div>
-
-  <div className="grid grid-cols-10 gap-1.5">
-  {Object.keys(MINGORA_TIMINGS).map((dateKey, index) => {
-  // FORCE CHECK for the first two days, otherwise check the actual log
-  const isBonusDay = ["2026-02-19", "2026-02-20", "2026-02-21", "2026-02-22", "2026-02-23"].includes(dateKey);
-  const isCompleted = isBonusDay || fastingLog.includes(dateKey);
+              <div className="flex items-center gap-4">
+                <button onClick={() => setSoundEnabled(!soundEnabled)} className="p-3 opacity-40 hover:opacity-100">
+                  {soundEnabled ? <Volume2 size={18}/> : <VolumeX size={18}/>}
+                </button>
+                
+                <button 
+                  onClick={() => setArchiveOpen(true)} 
+                  className="group px-6 py-2 font-black text-[10px] uppercase border-2 border-current hover:bg-current transition-all overflow-hidden relative"
+                >
+                  <span className="relative z-10 transition-colors duration-200 group-hover:text-[var(--bg)]" style={{ '--bg': theme.bg } as any}>Archives</span>
+                </button>
   
+                <button onClick={() => { 
+                  localStorage.removeItem('q_active_session'); 
+                  localStorage.removeItem('q_active_pass');
+                  window.location.reload(); }} 
+                  className="p-3 bg-red-500/10 text-red-500 rounded-full hover:bg-red-500 hover:text-white transition-all">
+                  <LogOut size={18}/>
+                </button>
+              </div>
+            </header>
+  
+            <div className="max-w-6xl mx-auto mb-6 flex flex-col gap-2 mt-16 md:mt-0">
+              <div className="flex flex-wrap items-center gap-4">
+                <div className="relative flex-1 max-w-xs">
+                  <Search className={`absolute left-3 top-1/2 -translate-y-1/2 ${isSearching ? 'animate-pulse' : 'opacity-40'}`} size={14} />
+                  <input 
+                    className="w-full bg-[#2D3328]/10 border-2 border-[#2D3328]/5 focus:border-[#2D3328]/20 rounded-full py-2.5 pl-10 pr-4 text-xs font-bold outline-none transition-all placeholder:text-[#2D3328]/30" 
+                    placeholder="Search City or Region..." 
+                    value={cityInput} 
+                    style={{ color: theme.text }}
+                    onChange={(e) => setCityInput(e.target.value)} 
+                    onKeyDown={(e) => e.key === 'Enter' && fetchCityTimings(cityInput)} 
+                  />
+                </div>
+  
+                <AnimatePresence>
+                  {detectedRegion && (
+                    <motion.div 
+                      initial={{ opacity: 0, x: -10 }} 
+                      animate={{ opacity: 1, x: 0 }}
+                      className="flex items-center gap-2 bg-green-500/10 text-green-500 px-4 py-2 rounded-full border border-green-500/20 text-[10px] font-black uppercase"
+                    >
+                      <CheckCircle2 size={12} />
+                      Mapped to: {detectedRegion}
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+  
+                {errorMsg && (
+                  <div className="text-red-500 text-[10px] font-black uppercase flex items-center gap-2 bg-red-500/10 px-4 py-2 rounded-full border border-red-500/20">
+                    <AlertTriangle size={12}/> {errorMsg}
+                  </div>
+                )}
+              </div>
+            </div>
+  
+            <div className="max-w-6xl mx-auto mb-12 grid grid-cols-1 lg:grid-cols-4 gap-6">
+              <div className="lg:col-span-3 border-2 p-8 md:p-12 rounded-[2.5rem] flex flex-col md:flex-row items-center justify-between gap-8" style={{ borderColor: theme.text + "15" }}>
+                <div>
+                  <div className="flex items-center gap-3 mb-2">
+                    <span className="text-[10px] font-black tracking-[0.4em] opacity-30 italic uppercase">
+                      {cd.label} @ {city.toUpperCase()}
+                    </span>
+                    <span className="px-3 py-1 bg-current/5 rounded-full text-[9px] font-bold opacity-60">
+                      Local: {localTime}
+                    </span>
+                  </div>
+                  <div className="flex items-baseline gap-1">
+                    <span className="text-7xl md:text-9xl font-black italic tracking-tighter tabular-nums">{cd.h}</span>
+                    <span className="text-3xl opacity-20 font-light">:</span>
+                    <span className="text-7xl md:text-9xl font-black italic tracking-tighter tabular-nums">{cd.m}</span>
+                  </div>
+                </div>
+                <div className="flex flex-col gap-6 text-right w-full md:w-auto">
+                  <div className="flex items-center justify-between md:justify-end gap-6 border-b border-current/10 pb-2">
+                    <Sunrise size={18} className="opacity-30" />
+                    <div className="text-right leading-none"><span className="text-[8px] font-black opacity-30 block mb-1">SUHOOR</span><span className="text-2xl font-black italic">{cd.sehar}</span></div>
+                  </div>
+                  <div className="flex items-center justify-between md:justify-end gap-6">
+                    <Sunset size={18} className="opacity-30" />
+                    <div className="text-right leading-none"><span className="text-[8px] font-black opacity-30 block mb-1">IFTAR</span><span className="text-2xl font-black italic">{cd.iftar}</span></div>
+                  </div>
+                </div>
+              </div>
+              <div className="border-2 p-8 rounded-[2.5rem] flex flex-col justify-center items-center text-center bg-current/[0.02]" style={{ borderColor: theme.text + "15" }}>
+                <Moon size={28} className="opacity-40 mb-4" />
+                <span className="text-[9px] font-black opacity-30 uppercase tracking-widest mb-1">Ramadan_Day</span>
+                <span className="text-4xl font-black italic">{ramadanDay.toString().padStart(2, '0')}<span className="text-lg opacity-20">/30</span></span>
+              </div>
+            </div>
+  
+            <main className="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-12">
+              <section className="lg:col-span-7">
+                <div className="border-2 p-16 text-center rounded-[3rem] relative flex items-center justify-center min-h-[500px]" style={{ borderColor: theme.text }}>
+                  <div className="relative cursor-pointer" onClick={handleDhikr}>
+                    <AnimatePresence>
+                      {particles.map((p) => (
+                        <motion.div key={p.id} initial={{ x: 0, y: 0, opacity: 1, scale: 1 }} animate={{ x: p.x, y: p.y, opacity: 0, scale: 0 }} exit={{ opacity: 0 }} className="absolute left-1/2 top-1/2 w-2 h-2 rounded-full z-10" style={{ backgroundColor: getOrbColor() }} />
+                      ))}
+                    </AnimatePresence>
+                    <motion.div 
+                      animate={controls}
+                      className="w-64 h-64 rounded-full relative flex flex-col items-center justify-center"
+                      style={{ 
+                        background: `radial-gradient(circle, ${getOrbColor()} 0%, transparent 70%)`,
+                        boxShadow: `0 0 ${20 + (count % 33) * 2}px ${getOrbColor()}`,
+                        border: `1px solid ${theme.text}20`
+                      }}
+                    >
+                      <motion.span key={count} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="text-6xl font-black italic z-20">{count}</motion.span>
+                      <p className="text-[8px] font-black uppercase tracking-[0.4em] opacity-40 mt-4">Tasbeeh</p>
+                      <svg className="absolute inset-0 w-full h-full -rotate-90">
+                        <motion.circle 
+                          cx="128" cy="128" r="120" 
+                          fill="none" 
+                          stroke="currentColor" 
+                          strokeWidth="2" 
+                          strokeDasharray="753" 
+                          animate={{ strokeDashoffset: 753 - (753 * (count % 33)) / 33 }}
+                          className="opacity-20"
+                        />
+                      </svg>
+                    </motion.div>
+                  </div>
+                </div>
+              </section>
+  
+              <aside className="lg:col-span-5">
+                <div className="border-2 p-10 rounded-[2.5rem] bg-current/[0.02]" style={{ borderColor: theme.text + "15" }}>
+                  <h3 className="text-xs font-black uppercase mb-8 opacity-40 italic tracking-widest">Rituals</h3>
+                  <div className="space-y-6">
+                    {["Tahajjud", "Surah Mulk", "Morning Adhkar", "Sadaqah"].map(item => (
+                      <div key={item} onClick={() => { const u = checkedItems.includes(item) ? checkedItems.filter(i => i !== item) : [...checkedItems, item]; setCheckedItems(u); sync({checks: u}); }} className="flex items-center gap-6 cursor-pointer group">
+                        <div className={`w-6 h-6 border-2 flex items-center justify-center transition-all ${checkedItems.includes(item) ? 'bg-current shadow-lg shadow-current/20' : ''}`} style={{ borderColor: theme.text }}>
+                          {checkedItems.includes(item) && <Check size={14} className="invert" />}
+                        </div>
+                        <span className={`text-xs font-black uppercase ${checkedItems.includes(item) ? 'opacity-20 line-through' : ''}`}>{item}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+  
+                {/* BEAUTIFUL NIGHTLY SUNNAH CALL-TO-ACTION */}
+                <motion.div 
+                  whileHover={{ y: -5, scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  className="mt-8 p-8 rounded-[2.5rem] bg-gradient-to-br from-[#1a1c1e] to-[#020403] border border-white/10 shadow-2xl relative overflow-hidden group cursor-pointer"
+                  onClick={() => setActiveTab('sunnah')}
+                >
+                  <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/10 blur-[50px] rounded-full -mr-16 -mt-16 group-hover:bg-amber-500/20 transition-colors" />
+                  <div className="relative z-10">
+                    <div className="flex items-center gap-3 mb-4">
+                      <div className="p-2 bg-amber-500/10 rounded-lg">
+                        <Moon size={18} className="text-amber-500" />
+                      </div>
+                      <span className="text-[10px] font-black uppercase tracking-[0.3em] text-amber-500/80">Evening Transition</span>
+                    </div>
+                    <h3 className="text-xl font-serif italic text-white mb-2">The night is falling...</h3>
+                    <p className="text-[10px] text-white/40 font-bold uppercase tracking-widest leading-relaxed mb-6">
+                      Would you like to fulfill your nightly <br/> Sunnah rituals now?
+                    </p>
+                    <div className="flex items-center gap-2 text-white group-hover:gap-4 transition-all">
+                      <span className="text-[9px] font-black uppercase tracking-[0.2em]">Enter Sunnatul Layl</span>
+                      <ArrowRight size={14} className="text-amber-500" />
+                    </div>
+                  </div>
+                </motion.div>
+                
+                <div className="mt-8 mb-12 p-6 bg-black/[0.03] rounded-[2rem] border border-black/5">
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center gap-2">
+                      <div className="w-2 h-2 rounded-full bg-[#FFBF00] animate-pulse" />
+                      <h4 className="text-[9px] font-black uppercase tracking-widest opacity-40">Roza Tracker</h4>
+                    </div>
+                    <span className="text-[10px] font-black opacity-30">{fastingLog.length}/30 DAYS</span>
+                  </div>
+                  <div className="grid grid-cols-10 gap-1.5">
+                  {Object.keys(MINGORA_TIMINGS).map((dateKey, index) => {
+  // A day is "completed" if it's in our log (which now includes the 6 days)
+  const isCompleted = fastingLog.includes(dateKey);
   const isToday = new Date().toISOString().split('T')[0] === dateKey;
   
   return (
@@ -998,14 +1073,61 @@ const loadUserData = async (name: string, passwordInput: string) => {
     </div>
   );
 })}
-  </div>
-</div>
-        </aside>
-      </main>
-
+                  </div>
+                </div>
+              </aside>
+            </main>
+          </motion.div>
+        ) : (
+          /* SUNNATUL LAYL (DIARY) VIEW */
+          <motion.div 
+            key="sunnah" 
+            initial={{ opacity: 0, x: 20 }} 
+            animate={{ opacity: 1, x: 0 }} 
+            exit={{ opacity: 0, x: -20 }}
+            className="min-h-screen"
+          >
+            <AlKhatm user={user} sync={sync} />
+            
+            {/* FLOATING RETURN BUTTON */}
+            
+            <button 
+  onClick={() => setActiveTab('tracker')}
+  className="
+    /* Positioning & Layering */
+    fixed top-6 left-6 z-[200] 
     
-
-      {/* ARCHIVE MODAL */}
+    /* MOBILE: Compact Styles */
+    px-2 py-2 gap-1.5 
+    
+    /* DESKTOP: Your Original Styles */
+    md:px-5 md:py-4 md:gap-3 
+    
+    /* Aesthetics (Unchanged) */
+    bg-white/10 backdrop-blur-2xl border border-white/20 rounded-full flex items-center group hover:bg-white/20 transition-all shadow-2xl"
+>
+  <ArrowRight 
+    size={14} 
+    className="rotate-180 text-amber-500 md:size-4" 
+  />
+  <span className="
+    /* Font size (Unchanged) */
+    text-[10px] font-black uppercase text-white
+    
+    /* MOBILE: Tighter letters to save space */
+    tracking-tighter 
+    
+    /* DESKTOP: Your original wide tracking */
+    md:tracking-[0.3em]
+  ">
+    Return to Tracker
+  </span>
+</button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+  
+      {/* SHARED MODALS & OVERLAYS (Accessible from both views) */}
       <AnimatePresence>
         {archiveOpen && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[500] bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
@@ -1014,10 +1136,7 @@ const loadUserData = async (name: string, passwordInput: string) => {
                 <h3 className="text-xl font-black uppercase italic flex items-center gap-3"><ScrollText size={24}/> The Great Archive</h3>
                 <button onClick={() => setArchiveOpen(false)} className="p-3 border-2 border-[#2D2D2A] rounded-full hover:bg-[#2D2D2A] hover:text-white transition-all"><X size={20}/></button>
               </div>
-              
               <div className="flex-1 overflow-y-auto p-8 md:p-12">
-
-                {/* 1. QURAN TRACKER (TOP) */}
                 <div className="mb-20">
                   <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-8">
                     <h4 className="text-[10px] font-black uppercase tracking-[0.4em] opacity-30 border-b border-black/10 pb-2 flex-1">Quran Completion Journey</h4>
@@ -1026,16 +1145,9 @@ const loadUserData = async (name: string, passwordInput: string) => {
                        <span className="text-[8px] font-bold opacity-30 block">COMPLETED</span>
                     </div>
                   </div>
-
-                  {/* Progress Bar */}
                   <div className="w-full h-4 bg-black/5 rounded-full mb-8 overflow-hidden border border-black/5">
-                    <motion.div 
-                      initial={{ width: 0 }} 
-                      animate={{ width: `${(quranProgress/30)*100}%` }} 
-                      className="h-full bg-[#2D2D2A]"
-                    />
+                    <motion.div initial={{ width: 0 }} animate={{ width: `${(quranProgress/30)*100}%` }} className="h-full bg-[#2D2D2A]" />
                   </div>
-
                   <div className="grid grid-cols-5 sm:grid-cols-10 gap-3">
                     {[...Array(30)].map((_, i) => (
                       <div key={i} onClick={() => {setQuranProgress(i+1); sync({quran: i+1});}} className={`aspect-square border-2 border-[#2D2D2A] rounded-xl flex items-center justify-center font-black cursor-pointer text-xs transition-all ${i < quranProgress ? 'bg-[#2D2D2A] text-white' : 'hover:bg-black/5 opacity-40'}`}>
@@ -1044,10 +1156,6 @@ const loadUserData = async (name: string, passwordInput: string) => {
                     ))}
                   </div>
                 </div>
-
-
-
-                {/* 2. CATEGORIZED DUAS (BOTTOM) */}
                 {["Ramadan", "Prophetic", "Quranic"].map(cat => (
                   <div key={cat} className="mb-16">
                     <h4 className="text-[10px] font-black uppercase tracking-[0.4em] mb-8 opacity-30 border-b border-black/10 pb-2">{cat} Supplications</h4>
@@ -1069,154 +1177,56 @@ const loadUserData = async (name: string, passwordInput: string) => {
           </motion.div>
         )}
       </AnimatePresence>
-
+  
       <AnimatePresence>
         {showWelcome && (
           <motion.div initial={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[600] bg-[#F5F5F0] flex flex-col items-center justify-center text-[#2D2D2A]">
-            {/* <Sparkles className="mb-8 opacity-20" size={48} /> */}
-            <h1 className="text-5xl font-black italic uppercase tracking-tighter text-center">
-              أهلاً، <br/>
-              <span className="text-3xl opacity-40">{user?.name}</span>
-            </h1>
+            <h1 className="text-5xl font-black italic uppercase tracking-tighter text-center">أهلاً، <br/><span className="text-3xl opacity-40">{user?.name}</span></h1>
           </motion.div>
         )}
       </AnimatePresence>
-
-      {/* IFTAR CELEBRATION OVERLAY */}
-<AnimatePresence>
-  {showIftarMubarak && (
-
-
-    <motion.div 
-      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-      className="fixed inset-0 z-[1000] flex items-center justify-center bg-[#FFBF00]"
-    >
-             
-      <motion.div 
-        initial={{ scale: 0.5, rotate: -10 }}
-        animate={{ scale: 1, rotate: 0 }}
-        className="text-center p-12 bg-white rounded-[4rem] shadow-[0_0_100px_rgba(255,255,255,0.5)]"
-      >
-        
-        <motion.div
-          animate={{ y: [0, -20, 0] }}
-          transition={{ duration: 2, repeat: Infinity }}
-          className="text-6xl mb-6"
-        >
-          🌙
-        </motion.div>
-        
-        <h2 className="text-6xl font-black italic uppercase text-[#2D2D2A] tracking-tighter">
-          Iftar Mubarak
-        </h2>
-        <p className="text-xs font-black uppercase opacity-40 mt-4 tracking-widest">
-          The fast is complete. May your prayers be accepted.
-        </p>
-        <motion.div 
-  initial={{ y: 20, opacity: 0 }}
-  animate={{ y: 0, opacity: 1 }}
-  transition={{ delay: 0.5 }}
-  className="mt-8 p-8 bg-black/5 rounded-[2.5rem] border border-black/10 backdrop-blur-sm max-w-md mx-auto"
->
-  <p className="text-3xl font-serif mb-4 text-[#2D2D2A]">
-    ذَهَبَ الظَّمَأُ وَابْتَلَّتِ الْعُرُوقُ وَثَبَتَ الأَجْرُ إِنْ شَاءَ اللَّهُ
-  </p>
-  <p className="text-[10px] font-black uppercase tracking-widest opacity-60 leading-tight">
-    "Thirst has gone, the veins are moistened, and the reward is certain, if Allah wills."
-  </p>
-        {/* Particle Burst for Iftar */}
-        <div className="absolute inset-0 pointer-events-none">
-           {[...Array(20)].map((_, i) => (
-             <motion.div
-               key={i}
-               initial={{ x: "50%", y: "50%" }}
-               animate={{ x: `${Math.random() * 100}%`, y: `${Math.random() * 100}%`, scale: [0, 1, 0] }}
-               transition={{ duration: 2, repeat: Infinity }}
-               className="absolute w-2 h-2 bg-white rounded-full"
-             />
-           ))}
-        </div>
-        </motion.div>
-      </motion.div>
-    </motion.div>
-  )}
-</AnimatePresence>
-
-{/* SEHAR CELEBRATION OVERLAY */}
-<AnimatePresence>
-  {showSeharMubarak && (
-    
-    <motion.div 
-      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-      className="fixed inset-0 z-[1000] flex items-center justify-center bg-[#0F0F0E]"
-    >
-      <motion.div 
-        initial={{ y: 100, opacity: 0 }}
-        animate={{ y: 0, opacity: 1 }}
-        className="text-center"
-      >
-        <div className="relative">
-          <motion.div 
-            animate={{ scale: [1, 1.5, 1], opacity: [0.3, 0.6, 0.3] }}
-            transition={{ duration: 4, repeat: Infinity }}
-            className="absolute inset-0 bg-blue-500/20 blur-[100px] rounded-full"
-          />
-          <h2 className="text-7xl font-black italic uppercase text-[#F5F5F0] relative z-10 tracking-tighter">
-            Suhoor Ends
-          </h2>
-          <p className="text-xs font-black uppercase text-blue-400 mt-4 tracking-[0.5em] relative z-10">
-            Intention set. The fast begins.
-          </p>
-          <motion.div 
-  initial={{ scale: 0.9, opacity: 0 }}
-  animate={{ scale: 1, opacity: 1 }}
-  transition={{ delay: 0.8 }}
-  className="mt-10 p-8 border-2 border-white/10 rounded-[2.5rem] bg-white/5 backdrop-blur-lg max-w-md mx-auto"
->
-  <span className="text-[9px] font-black text-blue-400 tracking-[0.4em] block mb-4">NIYYAH</span>
-  <p className="text-3xl font-serif mb-4 text-[#F5F5F0]">
-    وَبِصَوْمِ غَدٍ نَّوَيْتُ مِنْ شَهْرِ رَمَضَانَ
-  </p>
-  <p className="text-[10px] font-bold opacity-50 uppercase text-[#F5F5F0] italic tracking-tighter">
-    "I intend to keep the fast for tomorrow in the month of Ramadan."
-  </p>
-  </motion.div>
-          <Sunrise className="mx-auto mt-8 text-white opacity-20" size={48} />
-        </div>
-        
-      </motion.div>
-    </motion.div>
-  )}
-</AnimatePresence>
-{/* SHAHID ALI EXECUTIVE MARK - BOTTOM RIGHT */}
-<div className="absolute bottom-6 right-6 pointer-events-none select-none">
-  <motion.div 
-    initial={{ opacity: 0 }}
-    animate={{ opacity: 1 }}
-    className="flex flex-col items-end pointer-events-auto group"
-  >
-
-    {/* The Minimalist Label */}
-    <div className="flex items-center gap-2 overflow-hidden">
-      <motion.div 
-        initial={{ x: 50 }}
-        whileInView={{ x: 0 }}
-        className="h-[1px] w-6 bg-amber-500" 
-      />
-      <span className="text-[8px] font-black uppercase tracking-[0.3em] text-[#2D2D2A] opacity-40">
-        Built By <span className="text-[#2D2D2A] opacity-100">Shahid ALI</span>
-      </span>
-    </div>
-
-    {/* Creative Floating Dot */}
-    <div className="absolute -right-3 top-1/2 -translate-y-1/2 flex flex-col gap-1">
-      <div className="w-[2px] h-[2px] rounded-full bg-amber-500 animate-pulse" />
-      <div className="w-[2px] h-[2px] rounded-full bg-[#2D2D2A]/20" />
-      <div className="w-[2px] h-[2px] rounded-full bg-[#2D2D2A]/20" />
-    </div>
-  </motion.div>
-</div>
-    </div>
-  );
   
-}
+      <AnimatePresence>{showIftarMubarak && (
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[1000] flex items-center justify-center bg-[#FFBF00]">
+          <motion.div initial={{ scale: 0.5, rotate: -10 }} animate={{ scale: 1, rotate: 0 }} className="text-center p-12 bg-white rounded-[4rem] shadow-[0_0_100px_rgba(255,255,255,0.5)]">
+            <motion.div animate={{ y: [0, -20, 0] }} transition={{ duration: 2, repeat: Infinity }} className="text-6xl mb-6">🌙</motion.div>
+            <h2 className="text-6xl font-black italic uppercase text-[#2D2D2A] tracking-tighter">Iftar Mubarak</h2>
+            <motion.div initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.5 }} className="mt-8 p-8 bg-black/5 rounded-[2.5rem] border border-black/10 backdrop-blur-sm max-w-md mx-auto">
+              <p className="text-3xl font-serif mb-4 text-[#2D2D2A]">ذَهَبَ الظَّمَأُ وَابْتَلَّتِ الْعُرُوقُ وَثَبَتَ الأَجْرُ إِنْ شَاءَ اللَّهُ</p>
+              <p className="text-[10px] font-black uppercase tracking-widest opacity-60 leading-tight">"Thirst has gone, the veins are moistened, and the reward is certain, if Allah wills."</p>
+            </motion.div>
+          </motion.div>
+        </motion.div>
+      )}</AnimatePresence>
+  
+      <AnimatePresence>{showSeharMubarak && (
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[1000] flex items-center justify-center bg-[#0F0F0E]">
+          <motion.div initial={{ y: 100, opacity: 0 }} animate={{ y: 0, opacity: 1 }} className="text-center">
+            <div className="relative">
+              <motion.div animate={{ scale: [1, 1.5, 1], opacity: [0.3, 0.6, 0.3] }} transition={{ duration: 4, repeat: Infinity }} className="absolute inset-0 bg-blue-500/20 blur-[100px] rounded-full" />
+              <h2 className="text-7xl font-black italic uppercase text-[#F5F5F0] relative z-10 tracking-tighter">Suhoor Ends</h2>
+              <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ delay: 0.8 }} className="mt-10 p-8 border-2 border-white/10 rounded-[2.5rem] bg-white/5 backdrop-blur-lg max-w-md mx-auto">
+                <span className="text-[9px] font-black text-blue-400 tracking-[0.4em] block mb-4">NIYYAH</span>
+                <p className="text-3xl font-serif mb-4 text-[#F5F5F0]">وَبِصَوْمِ غَدٍ نَّوَيْتُ مِنْ شَهْرِ رَمَضَانَ</p>
+              </motion.div>
+              <Sunrise className="mx-auto mt-8 text-white opacity-20" size={48} />
+            </div>
+          </motion.div>
+        </motion.div>
+      )}</AnimatePresence>
+  
+      <div className="absolute bottom-6 right-6 pointer-events-none select-none">
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex flex-col items-end pointer-events-auto group">
+          <div className="flex items-center gap-2 overflow-hidden">
+            <motion.div initial={{ x: 50 }} whileInView={{ x: 0 }} className="h-[1px] w-6 bg-amber-500" />
+            <span className="text-[8px] font-black uppercase tracking-[0.3em] text-[#2D2D2A] opacity-40">Built By <span className="text-[#2D2D2A] opacity-100">Shahid ALI</span></span>
+          </div>
+          <div className="absolute -right-3 top-1/2 -translate-y-1/2 flex flex-col gap-1">
+            <div className="w-[2px] h-[2px] rounded-full bg-amber-500 animate-pulse" />
+            <div className="w-[2px] h-[2px] rounded-full bg-[#2D2D2A]/20" />
+            <div className="w-[2px] h-[2px] rounded-full bg-[#2D2D2A]/20" />
+          </div>
+        </motion.div>
+      </div>
+    </div>
+  );}
