@@ -122,6 +122,7 @@ export default function QamarFinal() {
   const [showIftarMubarak, setShowIftarMubarak] = useState(false);
   const [showSeharMubarak, setShowSeharMubarak] = useState(false);
   const [city, setCity] = useState("Mingora");
+  const [timings, setTimings] = useState<any>(null);
   const [cityInput, setCityInput] = useState("");
   const [isExternalCity, setIsExternalCity] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
@@ -140,6 +141,7 @@ export default function QamarFinal() {
   const [showSuggestionPopup, setShowSuggestionPopup] = useState(false);
   const [tempPass, setTempPass] = useState(""); 
   const [celebrated, setCelebrated] = useState(false);
+  const [access, setAccess] = useState(false); // or true if you want it open by default for testing
   const INITIAL_FASTING_DAYS = ["2026-02-19", "2026-02-20", "2026-02-21", "2026-02-22", "2026-02-23", "2026-02-24", "2026-02-25"];
   const [activeTab, setActiveTab] = useState<'tracker' | 'sunnah'>('tracker');
   const supabase = createClient('https://rqcbplnanidhqiwpgzrn.supabase.co', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJxY2JwbG5hbmlkaHFpd3BnenJuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk3NDEzNzEsImV4cCI6MjA4NTMxNzM3MX0.aikDCClbrh7F5V68uyjUlCuZotedUkeYwdzv8fnvEbA');
@@ -149,6 +151,59 @@ export default function QamarFinal() {
     setCount(0); // Reset UI state
     setFastingLog([]); // Reset UI state
     setIsLoginView(true);
+  };
+
+  // 1. Define the function
+const requestNotificationPermission = async () => {
+  if (!('Notification' in window)) return;
+  
+  if (Notification.permission === 'default') {
+    const permission = await Notification.requestPermission();
+    if (permission === 'granted') {
+      console.log('Permission secured');
+    }
+  }
+};
+
+
+
+ 
+  const [holdProgress, setHoldProgress] = useState(0);
+  const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const holdIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const [showResetRing, setShowResetRing] = useState(false);
+  const startPress = () => {
+    setHoldProgress(0);
+    setShowResetRing(false);
+
+  // 1. Delay the appearance of the red ring to prevent flickering on taps
+  timerRef.current = setTimeout(() => {
+    setShowResetRing(true);
+  }, 200);
+
+
+    // 1. Handle the actual Reset Logic
+    timerRef.current = setTimeout(() => {
+      setCount(0);
+      sync({ count: 0 });
+      setHoldProgress(0); // Reset ring after pop
+      controls.start({ scale: [1, 1.2, 1], transition: { duration: 0.3 } });
+    }, 1500);
+  
+    // 2. Handle the Visual Ring Animation (Updates every 10ms for smoothness)
+    const startTime = Date.now();
+    holdIntervalRef.current = setInterval(() => {
+      const elapsed = Date.now() - startTime;
+      const progress = Math.min((elapsed / 1500) * 100, 100);
+      setHoldProgress(progress);
+      if (progress >= 100) clearInterval(holdIntervalRef.current!);
+    }, 10);
+  };
+  
+  const endPress = () => {
+    if (timerRef.current) clearTimeout(timerRef.current);
+    if (holdIntervalRef.current) clearInterval(holdIntervalRef.current);
+    setHoldProgress(0); // Snap ring back to 0 if they let go
   };
 
   const [isNightTime, setIsNightTime] = useState(false);
@@ -267,6 +322,105 @@ useEffect(() => {
       fetchCityTimings("Mingora");
     }
   }, []); // Empty brackets mean "run on load"
+
+
+  // useEffect(() => {
+  //   // Guard: Only proceed if timings is an OBJECT and has Maghrib
+  //   if (!timings || typeof timings !== 'object' || !timings.Maghrib) return;
+  
+  //   const interval = setInterval(() => {
+  //     try {
+  //       if (!timings?.Maghrib || typeof timings.Maghrib !== 'string') return;
+  
+  //       const now = new Date();
+  //       const maghribValue = timings.Maghrib;
+  //       const [h, m] = maghribValue.split(':');
+        
+  //       const iftarTime = new Date();
+  //       iftarTime.setHours(parseInt(h), parseInt(m), 0);
+  
+  //       const diffInMins = Math.floor((iftarTime.getTime() - now.getTime()) / 60000);
+  
+  //       if (diffInMins === 5) {
+  //         if (Notification.permission === 'granted') {
+  //           navigator.serviceWorker.ready.then(reg => {
+  //             reg.showNotification("Iftar Approaching 🌙", {
+  //               body: "5 minutes until Iftar. Get prepared.",
+  //               vibrate: [200, 100, 200]
+  //             });
+  //           });
+  //         }
+  //       }
+  //     } catch (err) {
+  //       console.error("Timer error:", err);
+  //     }
+  //   }, 60000);
+  
+  //   return () => clearInterval(interval);
+  // }, [timings]);
+
+  useEffect(() => {
+    if (!timings || typeof timings !== 'object' || !timings.Maghrib || !timings.Fajr) return;
+  
+    const interval = setInterval(() => {
+      try {
+        const now = new Date();
+        
+        // --- 1. IFTAR CALCULATION ---
+        const [iH, iM] = timings.Maghrib.split(':');
+        const iftarTime = new Date();
+        iftarTime.setHours(parseInt(iH), parseInt(iM), 0);
+        const iftarDiff = Math.floor((iftarTime.getTime() - now.getTime()) / 60000);
+  
+        // --- 2. SUHOOR CALCULATION ---
+        const [sH, sM] = timings.Fajr.split(':');
+        const suhoorTime = new Date();
+        suhoorTime.setHours(parseInt(sH), parseInt(sM), 0);
+        const suhoorDiff = Math.floor((suhoorTime.getTime() - now.getTime()) / 60000);
+  
+        // DEBUG: See the minutes in your console (F12)
+        console.log(`Minutes until Iftar: ${iftarDiff} | Minutes until Suhoor ends: ${suhoorDiff}`);
+  
+        if (Notification.permission === 'granted') {
+          // Iftar Alert (5 mins before)
+          if (iftarDiff === 2) {
+            sendNotification("Iftar Approaching 🌙", "5 minutes until Iftar. Get prepared!");
+          }
+          
+          // Suhoor Alert (5 mins before Fajr)
+          if (suhoorDiff === 5) {
+            sendNotification("Suhoor Ending ⏳", "5 minutes until Suhoor ends. Finish your meal!");
+          }
+  
+          // --- TESTING MODE: Trigger immediately if diff is positive ---
+          // Change the '5' to '> 0' only for a quick 1-minute test
+          if (iftarDiff > 0 && iftarDiff < 1440) { 
+             console.log("Test: Iftar is in the future today.");
+          }
+        }
+      } catch (e) {
+        console.error("Timer error:", e);
+      }
+    }, 60000);
+  
+    return () => clearInterval(interval);
+  }, [timings]);
+  
+  // Helper function to keep code clean
+  const sendNotification = (title: string, body: string) => {
+    if (!('serviceWorker' in navigator)) return;
+  
+    navigator.serviceWorker.ready.then(reg => {
+      reg.showNotification(title, {
+        body,
+        icon: "/icon.png",
+        tag: title.toLowerCase().replace(/\s/g, '-'),
+        // Casting 'as any' fixes the TypeScript error while keeping the vibration on mobile
+        vibrate: [200, 100, 200],
+      } as any); 
+    });
+  };
+
   const hasInitialized = useRef(false);
   const audioCtx = useRef<AudioContext | null>(null);
 
@@ -360,6 +514,13 @@ useEffect(() => {
     if (progress < 0.5) return "rgba(255, 191, 0, 0.3)";
     return "rgba(255, 249, 227, 0.9)";
   };
+
+  // const getOrbColor = () => {
+  //   if (count >= 30) return '#a855f7'; // Royal Purple for 10k+
+  //   if (count >= 20) return '#3b82f6';  // Deep Blue for 5k+
+  //   if (count >= 10) return '#f59e0b';  // Golden Amber for 1k+
+  //   return theme.accent; // Default (Emerald/Green)
+  // };
   const [detectedRegion, setDetectedRegion] = useState(""); // NEW: Stores the actual location found
   const [isSearching, setIsSearching] = useState(false);
 
@@ -374,6 +535,13 @@ useEffect(() => {
       const dateStr = now.toISOString().split('T')[0]; // "2026-02-22"
       const localTimings = MINGORA_TIMINGS[dateStr] || MINGORA_TIMINGS["2026-02-22"];
       
+      // FIX HERE: Save the localTimings object, not the sanitized string
+    setTimings({
+      Maghrib: localTimings.iftar, // Map your 'iftar' to 'Maghrib' for the notification
+      Fajr: localTimings.sehar,
+      ...localTimings
+    });
+
       // Calculate Day 4 (Feb 22 - 18 = 4)
       const dayOfMonth = now.getDate();
       setRamadanDay(dayOfMonth - 18); 
@@ -625,6 +793,17 @@ if (missingDays.length > 0) {
   setFastingLog(updatedLog);
   setQuranProgress(vault.quran_progress || 0);
   setUser({ name: cleanName });
+
+  // DIRECT CALL (No useEffect here!)
+if ('Notification' in window) {
+  Notification.requestPermission().then(permission => {
+    if (permission === 'granted') {
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('/sw.js');
+      }
+    }
+  });
+}
   
   localStorage.setItem('q_active_session', cleanName);
   localStorage.setItem('q_active_pass', passwordInput);
@@ -986,40 +1165,78 @@ const sync = async (payload: any) => {
             </div>
   
             <main className="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-12">
-              <section className="lg:col-span-7">
-                <div className="border-2 p-16 text-center rounded-[3rem] relative flex items-center justify-center min-h-[500px]" style={{ borderColor: theme.text }}>
-                  <div className="relative cursor-pointer" onClick={handleDhikr}>
-                    <AnimatePresence>
-                      {particles.map((p) => (
-                        <motion.div key={p.id} initial={{ x: 0, y: 0, opacity: 1, scale: 1 }} animate={{ x: p.x, y: p.y, opacity: 0, scale: 0 }} exit={{ opacity: 0 }} className="absolute left-1/2 top-1/2 w-2 h-2 rounded-full z-10" style={{ backgroundColor: getOrbColor() }} />
-                      ))}
-                    </AnimatePresence>
-                    <motion.div 
-                      animate={controls}
-                      className="w-64 h-64 rounded-full relative flex flex-col items-center justify-center"
-                      style={{ 
-                        background: `radial-gradient(circle, ${getOrbColor()} 0%, transparent 70%)`,
-                        boxShadow: `0 0 ${20 + (count % 33) * 2}px ${getOrbColor()}`,
-                        border: `1px solid ${theme.text}20`
-                      }}
-                    >
-                      <motion.span key={count} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="text-6xl font-black italic z-20">{count}</motion.span>
-                      <p className="text-[8px] font-black uppercase tracking-[0.4em] opacity-40 mt-4">Tasbeeh</p>
-                      <svg className="absolute inset-0 w-full h-full -rotate-90">
-                        <motion.circle 
-                          cx="128" cy="128" r="120" 
-                          fill="none" 
-                          stroke="currentColor" 
-                          strokeWidth="2" 
-                          strokeDasharray="753" 
-                          animate={{ strokeDashoffset: 753 - (753 * (count % 33)) / 33 }}
-                          className="opacity-20"
-                        />
-                      </svg>
-                    </motion.div>
-                  </div>
-                </div>
-              </section>
+            <section className="lg:col-span-7">
+  <div className="border-2 p-16 text-center rounded-[3rem] relative flex flex-col items-center justify-center min-h-[500px]" style={{ borderColor: theme.text }}>
+
+    <div 
+      className="relative cursor-pointer" 
+      onClick={handleDhikr} // Single tap to count
+      onMouseDown={startPress} // Desktop hold
+      onMouseUp={endPress}
+      onMouseLeave={endPress}
+      onTouchStart={startPress} // Mobile hold
+      onTouchEnd={endPress}
+    >
+      <AnimatePresence>
+        {particles.map((p) => (
+          <motion.div key={p.id} initial={{ x: 0, y: 0, opacity: 1, scale: 1 }} animate={{ x: p.x, y: p.y, opacity: 0, scale: 0 }} exit={{ opacity: 0 }} className="absolute left-1/2 top-1/2 w-2 h-2 rounded-full z-10" style={{ backgroundColor: getOrbColor() }} />
+        ))}
+      </AnimatePresence>
+
+      <motion.div 
+        animate={controls}
+        className="w-64 h-64 rounded-full relative flex flex-col items-center justify-center transition-transform active:scale-95"
+        style={{ 
+          background: `radial-gradient(circle, ${getOrbColor()} 0%, transparent 70%)`,
+          boxShadow: `0 0 ${20 + (count % 33) * 2}px ${getOrbColor()}`,
+          border: `1px solid ${theme.text}20`
+        }}
+      >
+        <motion.span key={count} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="text-6xl font-black italic z-20">
+          {count}
+        </motion.span>
+        
+        <p className="text-[8px] font-black uppercase tracking-[0.4em] opacity-40 mt-4">Tasbeeh</p>
+
+        {/* Circular Progress (Visualizing the 33-count cycle) */}
+        <svg className="absolute inset-0 w-full h-full -rotate-90">
+          <motion.circle 
+            cx="128" cy="128" r="120" 
+            fill="none" stroke="currentColor" strokeWidth="2" strokeDasharray="753" 
+            animate={{ strokeDashoffset: 753 - (753 * (count % 33)) / 33 }}
+            className="opacity-20"
+          />
+          {/* NEW: Reset Hold Progress Ring */}
+
+    {/* Inside your SVG */}
+{showResetRing && holdProgress > 0 && (
+  <motion.circle 
+    initial={{ opacity: 0 }}
+    animate={{ opacity: 1 }}
+    cx="128" cy="128" r="120" 
+    fill="none" 
+    stroke="#ef4444" 
+    strokeWidth="4" 
+    strokeDasharray="753" 
+    strokeDashoffset={753 - (753 * holdProgress) / 100}
+    strokeLinecap="round"
+    className="drop-shadow-[0_0_8px_rgba(239,68,68,0.5)]"
+  />
+)}
+        </svg>
+      </motion.div>
+    </div>
+
+    {/* Guidance Text */}
+    <motion.p 
+      initial={{ opacity: 0.2 }}
+      whileHover={{ opacity: 0.6 }}
+      className="mt-8 text-[7px] font-black uppercase tracking-[0.5em] opacity-20"
+    >
+      Tap to count • Hold to reset
+    </motion.p>
+  </div>
+</section>
   
               <aside className="lg:col-span-5">
                 <div className="border-2 p-10 rounded-[2.5rem] bg-current/[0.02]" style={{ borderColor: theme.text + "15" }}>

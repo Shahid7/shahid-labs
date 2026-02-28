@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState } from 'react';
+import {motion} from 'framer-motion';
 import { Search, MapPin, Moon, CheckCircle2, Quote, History, X, Calendar } from 'lucide-react'
 import { createClient } from '@supabase/supabase-js';
 
@@ -109,22 +110,34 @@ export default function MasterAdmin() {
     </div>
 
     {/* 2. Quran Progress Tracker */}
-    <div className="border-l border-white/5 pl-6">
-        <span className="text-[8px] font-black opacity-30 uppercase block mb-3 tracking-widest text-emerald-500/60">Quran Registry</span>
-        <div className="space-y-2">
-            <p className="text-xs font-bold text-white/80">
-              {u.quran_last_surah ? `Last Read: ${u.quran_last_surah}` : 'No Reading Started'}
-            </p>
-            {/* If you store progress as a percentage or ayah count */}
-            <div className="w-full bg-white/5 h-1 rounded-full overflow-hidden">
-                <div 
-                  className="bg-emerald-500 h-full transition-all" 
-                  style={{ width: `${u.quran_completion || 0}%` }} 
-                />
-            </div>
-            <p className="text-[8px] opacity-40 uppercase">Progress: {u.quran_completion || 0}% Complete</p>
-        </div>
+<div className="border-l border-white/5 pl-6">
+    <span className="text-[8px] font-black opacity-30 uppercase block mb-3 tracking-widest text-emerald-500/60">
+      Quranic Milestone
+    </span>
+    
+    <div className="flex items-baseline gap-2">
+        {/* This displays the actual number (e.g., 22) */}
+        <p className={`text-3xl font-serif italic ${u.quran_progress === 30 ? 'text-amber-400 drop-shadow-md' : 'text-white/90'}`}>
+    {u.quran_progress === 30 ? "Khatam" : u.quran_progress}
+    </p>
+        <p className="text-[10px] font-black opacity-30 uppercase">
+            Parahs Marked
+        </p>
     </div>
+
+    {/* Visual Progress Bar */}
+    <div className="mt-4 w-full h-1 bg-white/5 rounded-full overflow-hidden">
+        <motion.div 
+            initial={{ width: 0 }}
+            animate={{ width: `${((u.quran_progress || 0) / 30) * 100}%` }}
+            className="h-full bg-emerald-500 shadow-[0_0_10px_#10b981]"
+        />
+    </div>
+
+    <p className="text-[7px] font-black opacity-20 uppercase mt-2 tracking-tighter">
+        Goal: 30 / 30 Completion
+    </p>
+</div>
 
     {/* 3. Ritual Stats */}
     <div className="border-l border-white/5 pl-6">
